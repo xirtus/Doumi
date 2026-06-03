@@ -1,0 +1,11 @@
+.build/
+*.o
+*.d
+Package.resolved
+.swiftpm/
+xcuserdata/
+*.xcworkspace
+DerivedData/
+.DS_Store
+*.dmg
+*.app/

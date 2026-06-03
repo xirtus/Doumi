@@ -53,8 +53,7 @@ cd "$tmpdir"
 Homebrew cask (recommended):
 
 ```bash
-brew tap xirtus/doumi
-brew install --cask doumi
+brew install --cask xirtus/doumi/doumi
 ```
 
 Or build from source — see [`Mac/README.md`](Mac/README.md#install) for details.

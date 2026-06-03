@@ -22,8 +22,7 @@ Rules live in plain YAML files you can edit in any text editor, version-control 
 ### Homebrew Cask (recommended)
 
 ```bash
-brew tap xirtus/doumi
-brew install --cask doumi
+brew install --cask xirtus/doumi/doumi
 ```
 
 That drops `Doumi.app` into `/Applications` and makes the `doumi` CLI available.

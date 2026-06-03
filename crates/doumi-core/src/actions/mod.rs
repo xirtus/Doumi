@@ -590,10 +590,21 @@ fn execute_set_permissions(file: &FileInfo, permissions: &str, dry_run: bool) ->
         );
     }
 
-    use std::os::unix::fs::PermissionsExt;
-    match std::fs::set_permissions(p, std::fs::Permissions::from_mode(mode)) {
-        Ok(()) => ActionResult::success("set_permissions", format!("chmod {permissions}")),
-        Err(e) => ActionResult::failure("set_permissions", e.to_string()),
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::set_permissions(p, std::fs::Permissions::from_mode(mode)) {
+            Ok(()) => ActionResult::success("set_permissions", format!("chmod {permissions}")),
+            Err(e) => ActionResult::failure("set_permissions", e.to_string()),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ActionResult::failure(
+            "set_permissions",
+            "set_permissions is not supported on this platform (available on Linux, macOS, BSD)",
+        )
     }
 }
 
@@ -712,15 +723,40 @@ fn execute_open(file: &FileInfo, command: Option<&str>, dry_run: bool) -> Action
     if dry_run {
         return ActionResult::success("open", format!("[dry-run] open {}", p.display()));
     }
-    let cmd = command.unwrap_or("xdg-open");
-    match std::process::Command::new(cmd)
-        .arg(p)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+
+    #[cfg(target_os = "windows")]
+    let default_cmd = "start";
+    #[cfg(not(target_os = "windows"))]
+    let default_cmd = "xdg-open";
+
+    let cmd = command.unwrap_or(default_cmd);
+
+    #[cfg(target_os = "windows")]
     {
-        Ok(_) => ActionResult::success("open", format!("Opened {}", p.display())),
-        Err(e) => ActionResult::failure("open", e.to_string()),
+        // On Windows, use "cmd /c start" to open the file with its default handler
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/c", "start", "", p.to_str().unwrap_or("")]);
+        match command
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(_) => ActionResult::success("open", format!("Opened {}", p.display())),
+            Err(e) => ActionResult::failure("open", e.to_string()),
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        match std::process::Command::new(cmd)
+            .arg(p)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(_) => ActionResult::success("open", format!("Opened {}", p.display())),
+            Err(e) => ActionResult::failure("open", e.to_string()),
+        }
     }
 }
 

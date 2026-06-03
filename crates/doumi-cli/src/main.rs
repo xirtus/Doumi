@@ -10,32 +10,85 @@ use doumi_core::loader::{load_rule_file, save_rule_file};
 use doumi_core::rule::FolderConfig;
 use doumi_core::scope::scan_folder_files;
 
-// ─── IPC helper ──────────────────────────────────────────────────────────────
+// ─── Cross-platform IPC helper ────────────────────────────────────────────────
 
-fn ipc_call(socket: &Path, cmd: Value) -> Value {
+#[cfg(unix)]
+mod ipc_client {
+    use super::*;
     use std::io::{BufRead, BufReader};
     use std::net::Shutdown;
     use std::os::unix::net::UnixStream;
 
-    let Ok(mut stream) = UnixStream::connect(socket) else {
-        return serde_json::json!({"ok": false, "error": "Daemon not running (socket not found)"});
-    };
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
-        .ok();
+    pub fn ipc_call(socket: &Path, cmd: Value) -> Value {
+        let Ok(mut stream) = UnixStream::connect(socket) else {
+            return serde_json::json!({"ok": false, "error": "Daemon not running (socket not found)"});
+        };
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .ok();
 
-    let _ = stream.write_all(serde_json::to_string(&cmd).unwrap().as_bytes());
-    let _ = stream.write_all(b"\n");
-    let _ = stream.shutdown(Shutdown::Write);
+        let _ = stream.write_all(serde_json::to_string(&cmd).unwrap().as_bytes());
+        let _ = stream.write_all(b"\n");
+        let _ = stream.shutdown(Shutdown::Write);
 
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    if reader.read_line(&mut line).unwrap_or(0) == 0 {
-        return serde_json::json!({"ok": false, "error": "No response from daemon"});
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
+        if reader.read_line(&mut line).unwrap_or(0) == 0 {
+            return serde_json::json!({"ok": false, "error": "No response from daemon"});
+        }
+        serde_json::from_str(&line)
+            .unwrap_or_else(|_| serde_json::json!({"ok": false, "error": "Invalid response"}))
     }
-    serde_json::from_str(&line)
-        .unwrap_or_else(|_| serde_json::json!({"ok": false, "error": "Invalid response"}))
 }
+
+#[cfg(windows)]
+mod ipc_client {
+    use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpStream;
+
+    pub fn ipc_call(socket: &Path, cmd: Value) -> Value {
+        // On Windows, the daemon stores the TCP port in a .port file
+        let port_path = socket.with_extension("port");
+        let port_str = match std::fs::read_to_string(&port_path) {
+            Ok(s) => s,
+            Err(_) => {
+                return serde_json::json!({"ok": false, "error": "Daemon not running (port file not found)"});
+            }
+        };
+        let port: u16 = match port_str.trim().parse() {
+            Ok(p) => p,
+            Err(_) => {
+                return serde_json::json!({"ok": false, "error": "Daemon not running (invalid port)"});
+            }
+        };
+
+        let mut stream = match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(s) => s,
+            Err(_) => {
+                return serde_json::json!({"ok": false, "error": "Daemon not running (connection refused)"});
+            }
+        };
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .ok();
+
+        let payload = serde_json::to_string(&cmd).unwrap();
+        let _ = stream.write_all(payload.as_bytes());
+        let _ = stream.write_all(b"\n");
+        let _ = stream.flush();
+
+        let mut reader = BufReader::new(&mut stream);
+        let mut line = String::new();
+        if reader.read_line(&mut line).unwrap_or(0) == 0 {
+            return serde_json::json!({"ok": false, "error": "No response from daemon"});
+        }
+        serde_json::from_str(&line)
+            .unwrap_or_else(|_| serde_json::json!({"ok": false, "error": "Invalid response"}))
+    }
+}
+
+use ipc_client::ipc_call;
 
 fn get_config() -> ConfigManager {
     ConfigManager::new().unwrap_or_else(|e| {
@@ -49,12 +102,12 @@ fn daemon_call(cmd: Value) -> Value {
     ipc_call(&cfg.ipc_socket_path(), cmd)
 }
 
-// ─── CLI definitions ─────────────────────────────────────────────────────────
+// ─── CLI definitions ──────────────────────────────────────────────────────────
 
 #[derive(Parser)]
 #[command(
     name = "doumi",
-    about = "Doumi — intelligent file organizer for Linux & BSD",
+    about = "Doumi — intelligent file organizer for Linux, BSD, macOS, and Windows",
     version
 )]
 struct Cli {
@@ -172,7 +225,7 @@ enum ConfigCmd {
     Dir,
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 fn main() {
     let cli = Cli::parse();
@@ -205,17 +258,26 @@ fn handle_daemon(cmd: DaemonCmd) {
             if debug {
                 child.arg("--debug");
             }
-            child
-                .stdout(process::Stdio::null())
-                .stderr(process::Stdio::null());
 
             #[cfg(unix)]
-            unsafe {
-                use std::os::unix::process::CommandExt;
-                child.pre_exec(|| {
-                    libc::setsid();
-                    Ok(())
-                });
+            {
+                child.stdout(process::Stdio::null()).stderr(process::Stdio::null());
+                unsafe {
+                    use std::os::unix::process::CommandExt;
+                    child.pre_exec(|| {
+                        libc::setsid();
+                        Ok(())
+                    });
+                }
+            }
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                child
+                    .stdout(process::Stdio::null())
+                    .stderr(process::Stdio::null())
+                    .creation_flags(0x00000008); // CREATE_NO_WINDOW
             }
 
             match child.spawn() {
@@ -230,26 +292,54 @@ fn handle_daemon(cmd: DaemonCmd) {
         DaemonCmd::Stop => {
             let cfg = get_config();
             let sock = cfg.ipc_socket_path();
-            if !sock.exists() {
-                eprintln!("Daemon not running");
-                return;
-            }
             let pid_file = sock.with_extension("pid");
+
+            #[cfg(windows)]
+            let port_file = sock.with_extension("port");
+
+            // Try graceful stop via PID file
             if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
                 if let Ok(pid) = pid_str.trim().parse::<u32>() {
                     #[cfg(unix)]
                     unsafe {
                         libc::kill(pid as i32, libc::SIGTERM);
                     }
-                    println!("Sent SIGTERM to pid {pid}");
+                    #[cfg(windows)]
+                    {
+                        // Use taskkill on Windows
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &pid.to_string(), "/F"])
+                            .stdout(process::Stdio::null())
+                            .stderr(process::Stdio::null())
+                            .status();
+                    }
+                    println!("Stopped daemon (pid {pid})");
+                    // Clean up port file on Windows
+                    #[cfg(windows)]
+                    let _ = std::fs::remove_file(&port_file);
+                    let _ = std::fs::remove_file(&pid_file);
                     return;
                 }
             }
-            // Fallback
-            let _ = std::process::Command::new("pkill")
-                .arg("-f")
-                .arg("doumid")
-                .status();
+
+            // Fallback: try pkill (Unix) or taskkill by name (Windows)
+            #[cfg(unix)]
+            {
+                let _ = std::process::Command::new("pkill")
+                    .arg("-f")
+                    .arg("doumid")
+                    .status();
+            }
+            #[cfg(windows)]
+            {
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/IM", "doumid.exe", "/F"])
+                    .stdout(process::Stdio::null())
+                    .stderr(process::Stdio::null())
+                    .status();
+                let _ = std::fs::remove_file(&port_file);
+            }
+            let _ = std::fs::remove_file(&pid_file);
             println!("Daemon stopped");
         }
 
@@ -304,7 +394,9 @@ fn handle_rules(cmd: RulesCmd) {
                 return;
             }
             if rules.is_empty() {
-                println!("No rules configured. Add one with: doumi rules add <name> -f <folder>");
+                println!(
+                    "No rules configured. Add one with: doumi rules add <name> -f <folder>"
+                );
                 return;
             }
             println!(
@@ -388,7 +480,12 @@ fn handle_rules(cmd: RulesCmd) {
             println!("Created rule {rule_id} → {}", path.display());
 
             if edit {
-                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+                let editor = std::env::var("EDITOR").unwrap_or_else(|_| {
+                    #[cfg(windows)]
+                    { "notepad.exe".to_string() }
+                    #[cfg(not(windows))]
+                    { "nano".to_string() }
+                });
                 let _ = std::process::Command::new(editor).arg(&path).status();
             }
         }
@@ -402,7 +499,12 @@ fn handle_rules(cmd: RulesCmd) {
             let src = rule
                 .source_file
                 .unwrap_or_else(|| cfg.rules_dir.join(format!("{rule_id}.json")));
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+            let editor = std::env::var("EDITOR").unwrap_or_else(|_| {
+                #[cfg(windows)]
+                { "notepad.exe".to_string() }
+                #[cfg(not(windows))]
+                { "nano".to_string() }
+            });
             let _ = std::process::Command::new(editor).arg(&src).status();
             println!("Tip: run 'doumi daemon reload' to apply changes");
         }
@@ -484,7 +586,9 @@ fn handle_rules(cmd: RulesCmd) {
                                 println!(
                                     "[dry] {}: skipped {} ({reason})",
                                     result.rule_name,
-                                    path.file_name().unwrap_or_default().to_string_lossy()
+                                    path.file_name()
+                                        .unwrap_or_default()
+                                        .to_string_lossy()
                                 );
                             }
                         } else if result.matched {
@@ -493,7 +597,9 @@ fn handle_rules(cmd: RulesCmd) {
                             println!(
                                 "{prefix}{}: matched {}",
                                 result.rule_name,
-                                path.file_name().unwrap_or_default().to_string_lossy()
+                                path.file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
                             );
                             for ar in &result.action_results {
                                 let icon = if ar.success { '✓' } else { '✗' };
@@ -679,7 +785,7 @@ fn handle_logs(limit: usize, rule: Option<&str>, json: bool) {
             .unwrap_or("?")
             .replace('T', " ");
         let name = entry["rule_name"].as_str().unwrap_or("?");
-        let fpath = std::path::Path::new(entry["file_path"].as_str().unwrap_or("?"))
+        let fpath = Path::new(entry["file_path"].as_str().unwrap_or("?"))
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
@@ -741,7 +847,7 @@ fn crate_db_fallback(
     Ok(Value::Array(rows))
 }
 
-// ─── Config commands ─────────────────────────────────────────────────────────
+// ─── Config commands ──────────────────────────────────────────────────────────
 
 fn handle_config(cmd: ConfigCmd) {
     match cmd {
@@ -770,11 +876,19 @@ fn handle_config(cmd: ConfigCmd) {
     }
 }
 
-// ─── GUI launcher ────────────────────────────────────────────────────────────
+// ─── GUI launcher ─────────────────────────────────────────────────────────────
 
 fn handle_gui() {
     let doumi_gui = find_binary("doumi-gui");
-    match std::process::Command::new(&doumi_gui).spawn() {
+    let mut cmd = std::process::Command::new(&doumi_gui);
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x00000008); // CREATE_NO_WINDOW
+    }
+
+    match cmd.spawn() {
         Ok(_) => {}
         Err(e) => {
             eprintln!("GUI unavailable: {e}");
@@ -783,15 +897,26 @@ fn handle_gui() {
     }
 }
 
-// ─── Utilities ───────────────────────────────────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 fn find_binary(name: &str) -> PathBuf {
     // Look next to current binary first
     if let Ok(exe) = std::env::current_exe() {
-        let sibling = exe.parent().unwrap_or(Path::new(".")).join(name);
+        let sibling = exe.parent().unwrap_or(Path::new(".")).join(binary_name(name));
         if sibling.exists() {
             return sibling;
         }
     }
-    PathBuf::from(name)
+    PathBuf::from(binary_name(name))
+}
+
+fn binary_name(name: &str) -> String {
+    #[cfg(windows)]
+    {
+        format!("{name}.exe")
+    }
+    #[cfg(not(windows))]
+    {
+        name.to_string()
+    }
 }

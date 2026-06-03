@@ -89,7 +89,9 @@ async fn main() -> anyhow::Result<()> {
     }
     #[cfg(not(unix))]
     {
+        info!("Press Ctrl+C to stop");
         tokio::signal::ctrl_c().await?;
+        info!("Ctrl+C received");
     }
 
     info!("Shutting down…");

@@ -7,4 +7,8 @@
 src/pkg/
 src/*.tar.gz
 !packaging/
+*.exe
+*.msi
+*.nupkg
+Windows/bin/
 NEXT_AGENT_HANDOFF.md

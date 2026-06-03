@@ -21,12 +21,25 @@ fn default_max_log() -> usize {
     10000
 }
 fn default_socket() -> String {
-    dirs::runtime_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".local").join("run")))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("doumi.sock")
-        .to_string_lossy()
-        .to_string()
+    #[cfg(unix)]
+    {
+        dirs::runtime_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join(".local").join("run")))
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("doumi.sock")
+            .to_string_lossy()
+            .to_string()
+    }
+    #[cfg(windows)]
+    {
+        // On Windows, store the socket marker next to config
+        dirs::data_local_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("doumi")
+            .join("doumi.sock")
+            .to_string_lossy()
+            .to_string()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

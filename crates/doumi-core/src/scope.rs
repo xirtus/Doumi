@@ -16,6 +16,15 @@ pub const PROJECT_MARKERS: &[&str] = &[
     "composer.json",
     "mix.exs",
     "deno.json",
+    // Windows / cross-platform project markers
+    ".sln",        // Visual Studio solution
+    ".csproj",     // C# project
+    ".vbproj",     // VB.NET project
+    "CMakeLists.txt",
+    "Makefile",
+    "gradle.build",
+    "build.gradle",
+    "settings.gradle",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]

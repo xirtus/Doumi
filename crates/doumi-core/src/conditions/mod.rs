@@ -641,15 +641,30 @@ impl Condition {
             }
 
             Condition::Permissions { operator } => {
-                use std::os::unix::fs::PermissionsExt;
-                let Ok(meta) = file.path.metadata() else {
-                    return false;
-                };
-                let mode = meta.permissions().mode();
-                match operator {
-                    PermOp::IsReadable => mode & 0o444 != 0,
-                    PermOp::IsWritable => mode & 0o222 != 0,
-                    PermOp::IsExecutable => mode & 0o111 != 0,
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let Ok(meta) = file.path.metadata() else {
+                        return false;
+                    };
+                    let mode = meta.permissions().mode();
+                    match operator {
+                        PermOp::IsReadable => mode & 0o444 != 0,
+                        PermOp::IsWritable => mode & 0o222 != 0,
+                        PermOp::IsExecutable => mode & 0o111 != 0,
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    let Ok(meta) = file.path.metadata() else {
+                        return false;
+                    };
+                    let perms = meta.permissions();
+                    match operator {
+                        PermOp::IsReadable => !perms.readonly(),
+                        PermOp::IsWritable => !perms.readonly(),
+                        PermOp::IsExecutable => false, // No execute bit concept on Windows
+                    }
                 }
             }
 

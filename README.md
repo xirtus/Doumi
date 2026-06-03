@@ -6,6 +6,7 @@
 **A bright, fast, open-source file automation assistant for people who want their desktop to clean itself.**
 
 [![Linux](https://img.shields.io/badge/Linux-Rust%20AppImage-2EA44F?style=for-the-badge&logo=linux&logoColor=white)](#linux)
+[![Windows](https://img.shields.io/badge/Windows-Rust%20MSVC-0078D6?style=for-the-badge&logo=windows&logoColor=white)](Windows/)
 [![BSD](https://img.shields.io/badge/BSD-Rust%20Port-AB2B28?style=for-the-badge&logo=freebsd&logoColor=white)](#freebsd)
 [![macOS](https://img.shields.io/badge/macOS-Swift%20Project-147EFB?style=for-the-badge&logo=apple&logoColor=white)](Mac/)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Free%20Forever-FFB000?style=for-the-badge)](LICENSE)
@@ -120,6 +121,24 @@ sysrc doumid_enable=YES
 # Optional: run in dry-run mode
 sysrc doumid_dry_run=YES
 ```
+
+### 🪟 Windows
+
+**Pre-built:** Download `doumi-windows-v*.zip` from
+**[GitHub Releases](https://github.com/xirtus/doumi/releases/latest)**,
+extract, and run `install.ps1`.
+
+**From source:**
+
+```powershell
+git clone https://github.com/xirtus/doumi.git
+cd doumi\Windows
+.\build.ps1
+.\install.ps1
+```
+
+**Requires:** Rust with MSVC toolchain.  See [Windows/README.md](Windows/README.md)
+for detailed instructions, service setup, and GUI notes.
 
 ### 😈 NetBSD / OpenBSD / DragonFly BSD
 
@@ -277,8 +296,8 @@ Hazel-like madlib editor so you never need to touch JSON.
 └──────────────┘                         └────────────────┘
 ```
 
-- **doumi** — CLI; talks to daemon over Unix socket, edits rule files
-- **doumid** — background daemon; watches files (inotify on Linux, kqueue on BSD), evaluates rules, executes actions
+- **doumi** — CLI; talks to daemon over Unix socket (Linux/BSD/macOS) or local TCP (Windows), edits rule files
+- **doumid** — background daemon; watches files (inotify on Linux, kqueue on BSD, ReadDirectoryChangesW on Windows), evaluates rules, executes actions
 - **doumi-gui** — GTK4 visual rule editor
 - **doumi-core** — shared library: rule engine, conditions, actions, config loading
 

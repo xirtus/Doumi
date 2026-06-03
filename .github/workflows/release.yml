@@ -109,10 +109,54 @@ jobs:
           path: /tmp/doumi.pkg.tar.zst
           if-no-files-found: error
 
+  # ─── Build Windows binaries ───────────────────────────────────────────────
+  build-windows:
+    name: Build Windows
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-
+
+      - name: Build release
+        run: cargo build --release -p doumi -p doumid
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          $outDir = "doumi-windows-v$ver"
+          New-Item -ItemType Directory -Path $outDir -Force
+
+          Copy-Item "target\release\doumi.exe"   "$outDir\"
+          Copy-Item "target\release\doumid.exe"  "$outDir\"
+          Copy-Item "LICENSE"                     "$outDir\"
+          Copy-Item "Windows\README.md"           "$outDir\"
+          Copy-Item "Windows\install.ps1"         "$outDir\"
+          Copy-Item "Windows\doumi-service.ps1"   "$outDir\"
+
+          Compress-Archive -Path "$outDir\*" -DestinationPath "doumi-windows-v$ver.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doumi-windows
+          path: doumi-windows-v*.zip
+          if-no-files-found: error
+
   # ─── GitHub Release ───────────────────────────────────────────────────────
   release:
     name: Create GitHub Release
-    needs: [version, build-deb, build-arch]
+    needs: [version, build-deb, build-arch, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -126,6 +170,11 @@ jobs:
         with:
           name: doumi-arch
 
+      - name: Download Windows zip
+        uses: actions/download-artifact@v4
+        with:
+          name: doumi-windows
+
       - name: Rename artifacts
         run: |
           mv doumi_*_amd64.deb  doumi_${{ needs.version.outputs.version }}_amd64.deb  2>/dev/null || true
@@ -138,6 +187,7 @@ jobs:
           files: |
             doumi_*.deb
             doumi-*.pkg.tar.zst
+            doumi-windows-*.zip
           generate_release_notes: true
 
   # ─── Deploy apt repo to GitHub Pages ──────────────────────────────────────

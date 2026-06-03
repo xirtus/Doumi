@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- App background gradient: deep teal to blue -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#29b6d4"/>
+      <stop offset="100%" stop-color="#0277bd"/>
+    </linearGradient>
+
+    <!-- Folder fill: warm white -->
+    <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#dff3fa"/>
+    </linearGradient>
+
+    <!-- Badge gradient: orange accent -->
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff8f00"/>
+      <stop offset="100%" stop-color="#e65100"/>
+    </linearGradient>
+
+    <!-- Subtle drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#005577" flood-opacity="0.28"/>
+    </filter>
+
+    <!-- Inner glow on bg -->
+    <radialGradient id="glow" cx="35%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="0" y="0" width="128" height="128" rx="28" ry="28" fill="url(#bg)"/>
+  <rect x="0" y="0" width="128" height="128" rx="28" ry="28" fill="url(#glow)"/>
+
+  <!-- Folder tab (left top) -->
+  <path d="M18 51 L18 43 Q18 38 23 38 L50 38 L56 32 L96 32 Q101 32 101 37 L101 51 Z"
+        fill="url(#folder)" filter="url(#shadow)"/>
+
+  <!-- Folder body -->
+  <rect x="18" y="51" width="83" height="47" rx="6" ry="6" fill="url(#folder)" filter="url(#shadow)"/>
+
+  <!-- File lines — left column -->
+  <rect x="30" y="63" width="30" height="3.5" rx="1.75" fill="#0277bd" opacity="0.45"/>
+  <rect x="30" y="72" width="42" height="3.5" rx="1.75" fill="#0277bd" opacity="0.30"/>
+  <rect x="30" y="81" width="22" height="3.5" rx="1.75" fill="#0277bd" opacity="0.20"/>
+
+  <!-- Sort arrow cluster — right column -->
+  <g transform="translate(79, 59)" fill="none" stroke="#0277bd" stroke-linecap="round" stroke-linejoin="round" opacity="0.75">
+    <!-- Arrow up -->
+    <polyline points="7,14 7,2" stroke-width="3.5"/>
+    <polyline points="2,7 7,2 12,7" stroke-width="3.5"/>
+    <!-- Arrow down -->
+    <polyline points="7,24 7,36" stroke-width="3.5"/>
+    <polyline points="2,31 7,36 12,31" stroke-width="3.5"/>
+  </g>
+
+  <!-- Orange "spark" badge — top right, signals automation -->
+  <circle cx="96" cy="29" r="13" fill="url(#badge)" filter="url(#shadow)"/>
+  <!-- Lightning bolt / auto symbol -->
+  <path d="M99 21 L93 29 L97 29 L93 37 L101 27 L97 27 Z"
+        fill="white" opacity="0.95"/>
+</svg>

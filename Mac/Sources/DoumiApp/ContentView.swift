@@ -11,7 +11,7 @@ struct ContentView: View {
     @State private var showRuleEditor = false
     @Environment(\.openWindow) private var openWindow
 
-    enum SidebarItem: Hashable { case watchers, activity, settings }
+    enum SidebarItem: Hashable { case watchers, activity, settings, templates }
 
     private var sidebarSelection: Binding<SidebarItem?> {
         Binding(
@@ -197,6 +197,8 @@ struct ContentView: View {
             ActivityView()
         case .settings:
             SettingsView()
+        case .templates:
+            RuleTemplatesView()
         }
     }
 }
@@ -225,6 +227,8 @@ struct SidebarView: View {
             Section {
                 Label("Activity", systemImage: "list.bullet.rectangle.portrait")
                     .tag(ContentView.SidebarItem.activity)
+                Label("Rule Library", systemImage: "books.vertical.fill")
+                    .tag(ContentView.SidebarItem.templates)
                 Label("Settings", systemImage: "gearshape")
                     .tag(ContentView.SidebarItem.settings)
             }

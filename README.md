@@ -1,6 +1,20 @@
-# Doumi — Intelligent File Organizer for Linux & BSD
+<img width="784" height="657" alt="doumi" src="https://github.com/user-attachments/assets/b6247595-dbf4-42ec-a4a6-3cc3e2ebf3e2" />
+<div align="center">
 
-[![CI](https://github.com/YOUR_USERNAME/doumi/actions/workflows/release.yml/badge.svg)](https://github.com/YOUR_USERNAME/doumi/actions)
+# Doumi
+
+**A bright, fast, open-source file automation assistant for people who want their desktop to clean itself.**
+
+[![Linux](https://img.shields.io/badge/Linux-Rust%20AppImage-2EA44F?style=for-the-badge&logo=linux&logoColor=white)](#linux)
+[![BSD](https://img.shields.io/badge/BSD-Rust%20Port-AB2B28?style=for-the-badge&logo=freebsd&logoColor=white)](#freebsd)
+[![macOS](https://img.shields.io/badge/macOS-Swift%20Project-147EFB?style=for-the-badge&logo=apple&logoColor=white)](Mac/)
+[![Open Source](https://img.shields.io/badge/Open%20Source-Free%20Forever-FFB000?style=for-the-badge)](LICENSE)
+
+**Rules you can read. Automation you can trust. A cleaner home folder without a closed, proprietary rules box.**
+
+</div>
+
+---
 
 **Doumi** watches your folders and automatically organizes files using rules
 you define — like Hazel for macOS, but native on Linux and BSD.  Move, rename,
@@ -14,7 +28,7 @@ GTK4 GUI, and CLI.
 
 ## Installation
 
-> **Note:** these URLs use `YOUR_USERNAME` as a placeholder. Replace it with the
+> **Note:** these URLs use `xirtus` as a placeholder. Replace it with the
 > GitHub username or organization where this repo is hosted. If you're reading this
 > on a fork, the repo owner already set this up.
 
@@ -22,10 +36,10 @@ GTK4 GUI, and CLI.
 
 ```bash
 # 1. Add the Doumi repository (one-time)
-curl -fsSL https://YOUR_USERNAME.github.io/doumi/debian/gpg.key | \
+curl -fsSL https://xirtus.github.io/doumi/debian/gpg.key | \
   sudo gpg --dearmor -o /usr/share/keyrings/doumi-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/doumi-archive-keyring.gpg] \
-  https://YOUR_USERNAME.github.io/doumi/debian stable main" | \
+  https://xirtus.github.io/doumi/debian stable main" | \
   sudo tee /etc/apt/sources.list.d/doumi.list
 
 # 2. Install
@@ -38,7 +52,7 @@ Once the repo is added, **future updates arrive with your normal system updates.
 #### Alternative: grab the `.deb` directly from GitHub Releases
 
 ```bash
-curl -LO https://github.com/YOUR_USERNAME/doumi/releases/latest/download/doumi_amd64.deb
+curl -LO https://github.com/xirtus/doumi/releases/latest/download/doumi_amd64.deb
 sudo apt install ./doumi_amd64.deb
 ```
 
@@ -54,16 +68,16 @@ paru -S doumi
 Or add the custom repo for direct `pacman -S doumi`:
 
 ```bash
-curl -fsSL https://YOUR_USERNAME.github.io/doumi/arch/gpg.key | sudo pacman-key --add -
+curl -fsSL https://xirtus.github.io/doumi/arch/gpg.key | sudo pacman-key --add -
 sudo pacman-key --lsign-key doumi@example.com
-echo -e "\n[doumi]\nServer = https://YOUR_USERNAME.github.io/doumi/arch/\n" | sudo tee -a /etc/pacman.conf
+echo -e "\n[doumi]\nServer = https://xirtus.github.io/doumi/arch/\n" | sudo tee -a /etc/pacman.conf
 sudo pacman -Syu doumi
 ```
 
 ### 🐳 Build from source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/doumi.git
+git clone https://github.com/xirtus/doumi.git
 cd doumi
 cargo build --release
 ./target/release/doumi --help
@@ -89,7 +103,7 @@ pkg install doumi
 #### Quick install script
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/doumi.git
+git clone https://github.com/xirtus/doumi.git
 cd doumi
 ./install-bsd.sh
 ```

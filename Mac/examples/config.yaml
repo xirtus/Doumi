@@ -1,0 +1,144 @@
+# Doumi configuration — copy to ~/.config/doumi/config.yaml
+#
+# Template variables available in `to:` and `message:` fields:
+#   {filename}      full filename with extension
+#   {name} / {stem} filename without extension
+#   {ext}           extension (no dot)
+#   {year}          4-digit year (from file modification date)
+#   {month}         2-digit month
+#   {day}           2-digit day
+#   {date}          YYYY-MM-DD
+#   {time}          HH-MM-SS
+#   {hour} {minute} time components
+#   {created_year}  same but from creation date
+#   {size}          file size in bytes
+
+global:
+  dry_run: false      # set to true to preview without making changes
+  log_level: info     # debug | info | warn | error
+
+# ─── Desktop ──────────────────────────────────────────────────────────────────
+watch:
+  - name: Desktop Cleanup
+    path: ~/Desktop
+    recursive: false
+    rules:
+
+      - name: Sort Screenshots
+        match: all
+        conditions:
+          - type: name
+            starts_with: "Screenshot"
+          - type: extension
+            one_of: [png, jpg, jpeg]
+        actions:
+          - type: move
+            to: ~/Pictures/Screenshots/{year}-{month}/
+          - type: notify
+            message: "Moved {filename} to Screenshots"
+
+      - name: Remove Desktop .DS_Store
+        conditions:
+          - type: name
+            is: .DS_Store
+        actions:
+          - type: delete
+
+# ─── Downloads ────────────────────────────────────────────────────────────────
+  - name: Downloads Organizer
+    path: ~/Downloads
+    recursive: false
+    rules:
+
+      - name: Move Disk Images to Installers
+        conditions:
+          - type: extension
+            one_of: [dmg, pkg, iso]
+        actions:
+          - type: move
+            to: ~/Downloads/Installers/
+
+      - name: Archive PDFs older than 7 days
+        conditions:
+          - type: extension
+            is: pdf
+          - type: age
+            older_than: 7d
+        actions:
+          - type: move
+            to: ~/Documents/PDFs/{year}/
+            on_conflict: rename
+
+      - name: Move ZIP archives
+        conditions:
+          - type: extension
+            one_of: [zip, tar, gz, bz2, 7z, rar]
+        actions:
+          - type: move
+            to: ~/Downloads/Archives/
+
+      - name: Move Videos
+        conditions:
+          - type: extension
+            one_of: [mp4, mov, mkv, avi, m4v, webm]
+        actions:
+          - type: move
+            to: ~/Movies/Downloads/
+
+      - name: Trash tiny files older than 30 days
+        match: all
+        conditions:
+          - type: kind
+            is: file
+          - type: size
+            lt: 1kb
+          - type: age
+            older_than: 30d
+        actions:
+          - type: trash
+          - type: notify
+            message: "Trashed small stale file: {filename}"
+
+# ─── Advanced example: run a shell script ────────────────────────────────────
+  - name: Incoming Processor
+    path: ~/incoming-port
+    recursive: false
+    rules:
+
+      - name: Process new text files with custom script
+        conditions:
+          - type: extension
+            is: txt
+          - type: age
+            newer_than: 5s   # recently added
+        actions:
+          - type: run
+            command: 'echo "New file arrived: $DOUMI_FILE" >> ~/incoming-port/log.txt'
+          - type: move
+            to: ~/incoming-port/processed/
+
+      - name: Skip hidden files
+        conditions:
+          - type: name
+            starts_with: "."
+        actions:
+          - type: log
+            message: "Ignoring hidden file: {filename}"
+
+# ─── Script-based condition example ──────────────────────────────────────────
+  - name: Large File Watcher
+    path: ~/Downloads
+    recursive: false
+    rules:
+
+      - name: Alert on very large downloads
+        conditions:
+          - type: size
+            gt: 2gb
+          - type: kind
+            is: file
+        actions:
+          - type: notify
+            title: "Large File Downloaded"
+            message: "{filename} ({size} bytes)"
+          - type: log

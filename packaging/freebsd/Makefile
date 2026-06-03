@@ -4,14 +4,14 @@ CATEGORIES=	sysutils
 
 MAINTAINER=	doumi@example.com
 COMMENT=	Intelligent file organizer with real-time watching and cron scheduling
-WWW=		https://github.com/YOUR_USERNAME/doumi
+WWW=		https://github.com/xirtus/doumi
 
 LICENSE=	MIT
 LICENSE_FILE=	${WRKSRC}/LICENSE
 
 USES=		cargo desktop-file-utils gnome pkgconfig
 USE_GITHUB=	yes
-GH_ACCOUNT=	YOUR_USERNAME
+GH_ACCOUNT=	xirtus
 
 USE_GNOME=	gtk40 libadwaita
 

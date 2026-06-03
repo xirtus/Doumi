@@ -1,0 +1,51 @@
+{
+  "id": "archive-old-downloads",
+  "name": "Archive Old Downloads",
+  "description": "Move files older than 30 days from Downloads to a dated archive folder",
+  "enabled": true,
+  "priority": 0,
+  "folders": [
+    {
+      "path": "~/Downloads",
+      "recursive": false,
+      "depth": 1
+    }
+  ],
+  "triggers": {
+    "on_add": false,
+    "on_modify": false,
+    "on_delete": false,
+    "schedule": "0 2 * * *"
+  },
+  "conditions": {
+    "type": "group",
+    "match": "all",
+    "items": [
+      {
+        "type": "is_directory",
+        "value": false
+      },
+      {
+        "type": "age",
+        "operator": "older_than",
+        "value": 30,
+        "unit": "days",
+        "date_type": "modified"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "move",
+      "destination": "~/Archive/{year}/{month_name}",
+      "on_conflict": "rename",
+      "create_parents": true
+    },
+    {
+      "type": "notify",
+      "title": "Doumi",
+      "body": "Archived {filename} → Archive/{year}/{month_name}"
+    }
+  ],
+  "continue_matching": true
+}

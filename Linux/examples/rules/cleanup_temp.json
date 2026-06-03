@@ -1,0 +1,59 @@
+{
+  "id": "cleanup-temp-files",
+  "name": "Delete Temp Files",
+  "description": "Permanently delete .tmp, .DS_Store, Thumbs.db and log files older than 7 days",
+  "enabled": true,
+  "priority": 10,
+  "folders": [
+    {
+      "path": "~/Downloads",
+      "recursive": true,
+      "depth": 3
+    },
+    {
+      "path": "~/Desktop",
+      "recursive": false
+    }
+  ],
+  "triggers": {
+    "on_add": false,
+    "on_modify": false,
+    "on_delete": false,
+    "schedule": "0 3 * * 0"
+  },
+  "conditions": {
+    "type": "group",
+    "match": "any",
+    "items": [
+      {
+        "type": "group",
+        "match": "all",
+        "items": [
+          {
+            "type": "extension",
+            "operator": "is_one_of",
+            "value": ["tmp", "temp", "log", "bak", "old"]
+          },
+          {
+            "type": "age",
+            "operator": "older_than",
+            "value": 7,
+            "unit": "days",
+            "date_type": "modified"
+          }
+        ]
+      },
+      {
+        "type": "name",
+        "operator": "is_one_of",
+        "value": [".DS_Store", "Thumbs.db", "desktop.ini", ".localized"]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "delete"
+    }
+  ],
+  "continue_matching": false
+}

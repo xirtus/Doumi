@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 APP="Doumi"
 BUNDLE_ID="com.doumi.app"
-VERSION="0.1.0"
+VERSION="0.1.1"
 BUILD_DIR=".build/release"
 APP_DIR="$APP.app"
 
@@ -58,7 +58,7 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
     <key>NSAppTransportSecurity</key>
         <dict><key>NSAllowsArbitraryLoads</key><true/></dict>
     <key>NSHumanReadableCopyright</key>
-        <string>Copyright © 2026 Doumi. MIT License.</string>
+        <string>Copyright © 2026 Doumi. GNU GPL v3.</string>
 </dict>
 </plist>
 PLIST

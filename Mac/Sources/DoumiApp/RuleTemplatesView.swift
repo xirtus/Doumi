@@ -390,7 +390,7 @@ enum RuleTemplateLibrary {
 // MARK: - Templates View
 
 struct RuleTemplatesView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @State private var selectedCategory: TemplateCategory? = nil
     @State private var searchText = ""
     @State private var addingTemplate: RuleTemplate? = nil
@@ -447,7 +447,7 @@ struct RuleTemplatesView: View {
         .searchable(text: $searchText, prompt: "Search templates…")
         .sheet(item: $addingTemplate) { template in
             AddTemplateSheet(template: template)
-                .environmentObject(state)
+                .environment(state)
         }
     }
 
@@ -700,7 +700,7 @@ private struct TemplateCard: View {
 
 private struct AddTemplateSheet: View {
     let template: RuleTemplate
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedPath: String = ""

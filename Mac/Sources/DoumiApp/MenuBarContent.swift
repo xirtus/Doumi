@@ -2,7 +2,7 @@ import SwiftUI
 import DoumiCore
 
 struct MenuBarContent: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,8 +83,8 @@ struct MenuBarContent: View {
     }
 
     private func cleanMessage(_ msg: String) -> String {
-        if let range = msg.range(of: #"^\[\d{2}:\d{2}:\d{2}\]\s+"#, options: .regularExpression) {
-            return String(msg[range.upperBound...])
+        if let m = msg.firstMatch(of: /^\[\d{2}:\d{2}:\d{2}\]\s+/) {
+            return String(msg[m.range.upperBound...])
         }
         return msg
     }

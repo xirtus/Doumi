@@ -5,7 +5,7 @@ import DoumiCore
 struct WatcherDetailView: View {
     let watcher: WatcherConfig
     let ruleSearch: String
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @State private var expandedRules: Set<UUID> = []
     @State private var showDisabled = true
     @State private var showRuleEditor = false
@@ -67,7 +67,7 @@ struct WatcherDetailView: View {
             RuleEditorView(initialFolderPath: watcher.path) { folderPath, rule in
                 state.addRule(rule, toFolderPath: folderPath)
             }
-            .environmentObject(state)
+            .environment(state)
         }
     }
 

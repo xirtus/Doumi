@@ -3,7 +3,7 @@ import AppKit
 import DoumiCore
 
 struct ContentView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @State private var selection: SidebarItem? = .watchers
     @State private var ruleSearch = ""
     @State private var pendingSelection: SidebarItem? = nil
@@ -39,7 +39,7 @@ struct ContentView: View {
             RuleEditorView(initialFolderPath: state.selectedWatcher?.path) { folderPath, rule in
                 state.addRule(rule, toFolderPath: folderPath)
             }
-            .environmentObject(state)
+            .environment(state)
         }
         .alert("Unsaved Settings", isPresented: $showUnsavedSettingsAlert) {
             Button("Save & Continue") {
@@ -206,7 +206,7 @@ struct ContentView: View {
 // MARK: - Sidebar
 
 struct SidebarView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @Binding var selection: ContentView.SidebarItem?
 
     var body: some View {
@@ -285,7 +285,7 @@ struct WatcherRow: View {
 }
 
 struct EmptyStateView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "folder.badge.gearshape")

@@ -28,7 +28,7 @@ struct SharedOptions: ParsableArguments {
 
     func resolvedConfigURL() -> URL {
         if let c = config {
-            return URL(fileURLWithPath: (c as NSString).expandingTildeInPath)
+            return URL(filePath: (c as NSString).expandingTildeInPath)
         }
         return DoumiConfig.defaultConfigURL()
     }
@@ -194,7 +194,7 @@ struct Install: ParsableCommand {
         try plist.write(toFile: plistPath, atomically: true, encoding: .utf8)
 
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.executableURL = URL(filePath: "/bin/launchctl")
         p.arguments = ["load", plistPath]
         try p.run(); p.waitUntilExit()
 
@@ -214,7 +214,7 @@ struct Uninstall: ParsableCommand {
         let plistPath = "\(home)/Library/LaunchAgents/com.doumi.daemon.plist"
 
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.executableURL = URL(filePath: "/bin/launchctl")
         p.arguments = ["unload", plistPath]
         try? p.run(); p.waitUntilExit()
 

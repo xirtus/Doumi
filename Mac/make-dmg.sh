@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="Doumi"
-VERSION="0.1.0"
+VERSION="0.1.1"
 DMG="$APP-$VERSION.dmg"
 STAGING="/tmp/doumi-dmg-$$"
 

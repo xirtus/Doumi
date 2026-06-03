@@ -1,12 +1,22 @@
-import Foundation
-import CoreServices
+internal import Foundation
+internal import CoreServices
 
 // MARK: - Logger
 
 public enum Logger {
-    public static var level: LogLevel = .info
-    // Optional sink for the GUI to capture log lines
-    public static var sink: ((String) -> Void)? = nil
+    private static let stateLock = NSLock()
+    nonisolated(unsafe) private static var _level: LogLevel = .info
+    nonisolated(unsafe) private static var _sink: (@Sendable (String) -> Void)? = nil
+
+    public static var level: LogLevel {
+        get { stateLock.withLock { _level } }
+        set { stateLock.withLock { _level = newValue } }
+    }
+
+    public static var sink: (@Sendable (String) -> Void)? {
+        get { stateLock.withLock { _sink } }
+        set { stateLock.withLock { _sink = newValue } }
+    }
 
     public static func debug(_ msg: String) { emit(msg, level: .debug, tag: "DEBUG") }
     public static func info (_ msg: String) { emit(msg, level: .info,  tag: "     ") }
@@ -14,25 +24,28 @@ public enum Logger {
     public static func error(_ msg: String) { emit(msg, level: .error, tag: "ERROR") }
 
     private static func emit(_ msg: String, level req: LogLevel, tag: String) {
-        guard Logger.level <= req else { return }
+        let (currentLevel, currentSink) = stateLock.withLock { (_level, _sink) }
+        guard currentLevel <= req else { return }
         let line = "[\(ts())] \(tag) \(msg)"
         print(line)
-        sink?(line)
+        currentSink?(line)
     }
     private static func ts() -> String {
-        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f.string(from: Date())
+        Date.now.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
     }
 }
 
 // MARK: - DirectoryWatcher
 
-public final class DirectoryWatcher {
-    private var streams: [FSEventStreamRef] = []
+public final class DirectoryWatcher: @unchecked Sendable {
     private let engine: Engine
     private let watchers: [WatcherConfig]
-    private var lastSeen: [String: Date] = [:]
     private let debounceInterval: TimeInterval = 0.5
-    private let lock = NSLock()
+
+    // All mutable state lives behind `stateLock`.
+    private let stateLock = NSLock()
+    private var streams: [FSEventStreamRef] = []
+    private var lastSeen: [String: Date] = [:]
 
     public init(engine: Engine, watchers: [WatcherConfig]) {
         self.engine = engine
@@ -41,6 +54,7 @@ public final class DirectoryWatcher {
 
     /// Set up FSEvent streams — non-blocking. Call from GUI or CLI.
     public func start() {
+        var created = 0
         for w in watchers {
             guard w.enabled else { continue }
             let rootPath = (w.path as NSString).expandingTildeInPath
@@ -51,9 +65,10 @@ public final class DirectoryWatcher {
             guard let stream = makeStream(rootPath: rootPath, watcher: w) else {
                 Logger.error("Failed to create FSEvent stream for: \(rootPath)"); continue
             }
-            streams.append(stream)
+            stateLock.withLock { streams.append(stream) }
+            created += 1
         }
-        Logger.info("Doumi running — \(streams.count) folder(s) active")
+        Logger.info("Doumi running — \(created) folder(s) active")
     }
 
     /// Start and block forever — for CLI use.
@@ -63,8 +78,29 @@ public final class DirectoryWatcher {
     }
 
     public func stop() {
-        for s in streams { FSEventStreamStop(s); FSEventStreamInvalidate(s); FSEventStreamRelease(s) }
-        streams.removeAll()
+        let toStop = stateLock.withLock { () -> [FSEventStreamRef] in
+            let s = streams; streams.removeAll(); return s
+        }
+        for s in toStop {
+            FSEventStreamStop(s); FSEventStreamInvalidate(s); FSEventStreamRelease(s)
+        }
+    }
+
+    /// Called from the FSEvents callback. Debounces and dispatches to the engine.
+    fileprivate func handleEvent(path: String, watcher: WatcherConfig) {
+        let shouldProcess = stateLock.withLock { () -> Bool in
+            let now = Date()
+            if let last = lastSeen[path], now.timeIntervalSince(last) < debounceInterval {
+                return false
+            }
+            lastSeen[path] = now
+            return true
+        }
+        guard shouldProcess else { return }
+
+        let url = URL(filePath: path)
+        Logger.debug("Event: \(url.lastPathComponent)")
+        engine.handle(url: url, watcher: watcher)
     }
 
     private func makeStream(rootPath: String, watcher: WatcherConfig) -> FSEventStreamRef? {
@@ -96,19 +132,7 @@ public final class DirectoryWatcher {
                 let modified = f & UInt32(kFSEventStreamEventFlagItemModified)  != 0
                 let renamed  = f & UInt32(kFSEventStreamEventFlagItemRenamed)   != 0
                 guard isFile && (created || modified || renamed) else { continue }
-
-                box.watcher.lock.lock()
-                let now = Date()
-                if let last = box.watcher.lastSeen[path],
-                   now.timeIntervalSince(last) < box.watcher.debounceInterval {
-                    box.watcher.lock.unlock(); continue
-                }
-                box.watcher.lastSeen[path] = now
-                box.watcher.lock.unlock()
-
-                let url = URL(fileURLWithPath: path)
-                Logger.debug("Event: \(url.lastPathComponent)")
-                box.watcher.engine.handle(url: url, watcher: box.config)
+                box.watcher.handleEvent(path: path, watcher: box.config)
             }
         }
 

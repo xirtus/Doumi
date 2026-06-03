@@ -1,6 +1,7 @@
-import Foundation
+public import Foundation
+internal import Darwin
 
-public final class Engine {
+public final class Engine: Sendable {
     public let config: DoumiConfig
     public let dryRun: Bool
     private let queue = DispatchQueue(label: "com.doumi.engine", qos: .utility)
@@ -11,16 +12,16 @@ public final class Engine {
     }
 
     public func handle(url: URL, watcher: WatcherConfig) {
-        queue.async { [self] in
+        queue.async {
             guard FileManager.default.fileExists(atPath: url.path) else { return }
-            processFile(url: url, watcher: watcher)
+            self.processFile(url: url, watcher: watcher)
         }
     }
 
     public func scanDirectory(watcher: WatcherConfig) {
         let fm = FileManager.default
         let rootPath = (watcher.path as NSString).expandingTildeInPath
-        let rootURL = URL(fileURLWithPath: rootPath)
+        let rootURL = URL(filePath: rootPath)
 
         guard fm.fileExists(atPath: rootPath) else {
             Logger.warn("Path does not exist: \(rootPath)"); return
@@ -86,16 +87,13 @@ public final class Engine {
 
     private func checkName(url: URL, c: Condition) -> Bool {
         let name = url.lastPathComponent
-        if let p = c.glob,     !NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
-        if let p = c.notGlob,   NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
-        if let r = c.regex {
-            guard let re = try? NSRegularExpression(pattern: r),
-                  re.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil else { return false }
-        }
-        if let e = c.equals,      name.lowercased() != e.lowercased()                { return false }
-        if let s = c.contains,   !name.localizedCaseInsensitiveContains(s)           { return false }
-        if let p = c.startsWith, !name.lowercased().hasPrefix(p.lowercased())        { return false }
-        if let s = c.endsWith,   !name.lowercased().hasSuffix(s.lowercased())        { return false }
+        if let p = c.glob,    !globMatch(pattern: p, name: name) { return false }
+        if let p = c.notGlob,  globMatch(pattern: p, name: name) { return false }
+        if let r = c.regex,   !regexMatch(r, in: name)           { return false }
+        if let e = c.equals,      name.lowercased() != e.lowercased()         { return false }
+        if let s = c.contains,   !name.localizedCaseInsensitiveContains(s)    { return false }
+        if let p = c.startsWith, !name.lowercased().hasPrefix(p.lowercased()) { return false }
+        if let s = c.endsWith,   !name.lowercased().hasSuffix(s.lowercased()) { return false }
         return true
     }
 
@@ -129,8 +127,8 @@ public final class Engine {
         if let s = c.notInTheNext, let n = parseDurationSeconds(s), age < 0 && age >= -n { return false }
         if let iso = c.beforeDate, let d = parseISODate(iso), date >= d      { return false }
         if let iso = c.afterDate,  let d = parseISODate(iso), date <= d      { return false }
-        if c.isBlank == true  { return false }
-        if c.isBlank == false { return true }
+        // Date exists past the guard above; `is_blank: true` cannot match here.
+        if c.isBlank == true { return false }
         if let atT = c.atTime, !matchesTimeOfDay(date: date, timeStr: atT, mode: .equals)  { return false }
         if let bT  = c.beforeTime, !matchesTimeOfDay(date: date, timeStr: bT, mode: .before) { return false }
         if let aT  = c.afterTime,  !matchesTimeOfDay(date: date, timeStr: aT, mode: .after)  { return false }
@@ -160,16 +158,13 @@ public final class Engine {
 
     private func checkFullName(url: URL, c: Condition) -> Bool {
         let name = url.lastPathComponent
-        if let p = c.glob,     !NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
-        if let p = c.notGlob,   NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
-        if let r = c.regex {
-            guard let re = try? NSRegularExpression(pattern: r),
-                  re.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil else { return false }
-        }
-        if let e = c.equals,      name.lowercased() != e.lowercased()                { return false }
-        if let s = c.contains,   !name.localizedCaseInsensitiveContains(s)           { return false }
-        if let p = c.startsWith, !name.lowercased().hasPrefix(p.lowercased())        { return false }
-        if let s = c.endsWith,   !name.lowercased().hasSuffix(s.lowercased())        { return false }
+        if let p = c.glob,    !globMatch(pattern: p, name: name) { return false }
+        if let p = c.notGlob,  globMatch(pattern: p, name: name) { return false }
+        if let r = c.regex,   !regexMatch(r, in: name)           { return false }
+        if let e = c.equals,      name.lowercased() != e.lowercased()         { return false }
+        if let s = c.contains,   !name.localizedCaseInsensitiveContains(s)    { return false }
+        if let p = c.startsWith, !name.lowercased().hasPrefix(p.lowercased()) { return false }
+        if let s = c.endsWith,   !name.lowercased().hasSuffix(s.lowercased()) { return false }
         if let l = c.oneOf,     !l.map({$0.lowercased()}).contains(name.lowercased()) { return false }
         if let l = c.notOneOf,   l.map({$0.lowercased()}).contains(name.lowercased()) { return false }
         if c.isBlank == true  { return name.isEmpty }
@@ -180,27 +175,22 @@ public final class Engine {
     private func checkColorLabel(url: URL, c: Condition) -> Bool {
         guard let target = c.colorLabelValue else { return true }
         let script = "tell app \"Finder\" to get label index of (POSIX file \"\(url.path)\" as alias)"
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        let pipe = Pipe()
-        p.arguments = ["-e", script]; p.standardOutput = pipe
-        try? p.run(); p.waitUntilExit()
-        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let idx = Int(out.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let result = runAppleScript(script, captureOutput: true)
+        let idx = Int(result.output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         return idx == target
     }
 
     private func checkComment(url: URL, c: Condition) -> Bool {
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/mdls")
-        let pipe = Pipe()
-        p.arguments = ["-name", "kMDItemFinderComment", "-raw", url.path]; p.standardOutput = pipe
-        try? p.run(); p.waitUntilExit()
-        let comment = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let result = runProcess("/usr/bin/mdls",
+                                args: ["-name", "kMDItemFinderComment", "-raw", url.path],
+                                captureOutput: true)
+        let comment = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         if c.isBlank == true  { return comment.isEmpty || comment == "(null)" }
         if c.isBlank == false { return !comment.isEmpty && comment != "(null)" }
-        if let s = c.contains,   !comment.localizedCaseInsensitiveContains(s)             { return false }
-        if let s = c.equals,      comment.lowercased() != s.lowercased()                  { return false }
-        if let p = c.startsWith, !comment.lowercased().hasPrefix(p.lowercased())           { return false }
-        if let s = c.endsWith,   !comment.lowercased().hasSuffix(s.lowercased())           { return false }
+        if let s = c.contains,   !comment.localizedCaseInsensitiveContains(s)   { return false }
+        if let s = c.equals,      comment.lowercased() != s.lowercased()        { return false }
+        if let p = c.startsWith, !comment.lowercased().hasPrefix(p.lowercased()) { return false }
+        if let s = c.endsWith,   !comment.lowercased().hasSuffix(s.lowercased()) { return false }
         return true
     }
 
@@ -213,27 +203,21 @@ public final class Engine {
 
     private func checkContents(url: URL, c: Condition) -> Bool {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
-        if let s = c.contains,   !text.localizedCaseInsensitiveContains(s) { return false }
-        if let p = c.notGlob                                                { _ = p } // not supported for contents
-        if let r = c.regex {
-            guard let re = try? NSRegularExpression(pattern: r),
-                  re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil else { return false }
-        }
+        if let s = c.contains, !text.localizedCaseInsensitiveContains(s) { return false }
+        if let r = c.regex, !regexMatch(r, in: text) { return false }
         if c.isBlank == true  { return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if c.isBlank == false { return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return true
     }
 
     private func checkSourceURL(url: URL, c: Condition) -> Bool {
-        let xattr = Process(); xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        let pipe = Pipe()
-        xattr.arguments = ["-p", "com.apple.metadata:kMDItemWhereFroms", url.path]; xattr.standardOutput = pipe
-        try? xattr.run(); xattr.waitUntilExit()
-        let raw = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        if c.isBlank == true  { return raw.isEmpty }
-        if c.isBlank == false { return !raw.isEmpty }
-        if let s = c.contains, !raw.localizedCaseInsensitiveContains(s) { return false }
-        if let s = c.startsWith, !raw.lowercased().hasPrefix(s.lowercased()) { return false }
+        let sources = sourceURLs(forFile: url.path)
+        if c.isBlank == true  { return sources.isEmpty }
+        if c.isBlank == false { return !sources.isEmpty }
+        let joined = sources.joined(separator: " ")
+        if let s = c.contains,   !joined.localizedCaseInsensitiveContains(s) { return false }
+        if let s = c.startsWith, !sources.contains(where: { $0.lowercased().hasPrefix(s.lowercased()) }) { return false }
+        if let s = c.equals,     !sources.contains(where: { $0 == s }) { return false }
         return true
     }
 
@@ -251,8 +235,7 @@ public final class Engine {
     }
 
     private func checkItemCount(url: URL, c: Condition) -> Bool {
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { return false }
+        guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { return false }
         let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path))?.count ?? 0
         if let fc = c.fileCount { return count == fc }
         if let s = c.gt,  let n = UInt64(s) { if UInt64(count) <= n { return false } }
@@ -277,50 +260,40 @@ public final class Engine {
 
     private func checkAppleScript(url: URL, c: Condition) -> Bool {
         guard let script = c.run else { return false }
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        p.arguments = ["-e", script]
-        p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
-        try? p.run(); p.waitUntilExit()
-        return p.terminationStatus == 0
+        let env = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+        return runAppleScript(script, env: env).status == 0
     }
 
     private func checkJavaScript(url: URL, c: Condition) -> Bool {
         guard let script = c.run else { return false }
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        p.arguments = ["-l", "JavaScript", "-e", script]
-        p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
-        try? p.run(); p.waitUntilExit()
-        return p.terminationStatus == 0
+        let env = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+        return runJXA(script, env: env).status == 0
     }
 
     private func checkKind(url: URL, c: Condition) -> Bool {
         guard let kind = c.equals else { return true }
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return false }
+        guard let vals = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else { return false }
         switch kind.lowercased() {
-        case "file":                return !isDir.boolValue
-        case "directory", "folder": return isDir.boolValue
-        case "symlink", "link":
-            return (try? FileManager.default.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType) == .typeSymbolicLink
+        case "file":                return vals.isDirectory == false && vals.isSymbolicLink == false
+        case "directory", "folder": return vals.isDirectory == true
+        case "symlink", "link":     return vals.isSymbolicLink == true
         default: return false
         }
     }
 
     private func checkScript(url: URL, c: Condition) -> Bool {
         guard let script = c.run else { return false }
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-c", script]
-        p.environment = ProcessInfo.processInfo.environment.merging([
+        let env = ProcessInfo.processInfo.environment.merging([
             "DOUMI_FILE": url.path,
             "DOUMI_NAME": url.deletingPathExtension().lastPathComponent,
             "DOUMI_EXT":  url.pathExtension,
         ]) { $1 }
-        try? p.run(); p.waitUntilExit()
-        return p.terminationStatus == 0
+        return runProcess("/bin/sh", args: ["-c", script], env: env).status == 0
     }
 
     private func checkTags(url: URL, c: Condition) -> Bool {
         guard let required = c.oneOf, !required.isEmpty else { return true }
-        guard let tags = try? (url as NSURL).resourceValues(forKeys: [.tagNamesKey])[.tagNamesKey] as? [String] else { return false }
+        guard let tags = try? url.resourceValues(forKeys: [.tagNamesKey]).tagNames else { return false }
         return required.allSatisfy { tags.contains($0) }
     }
 
@@ -341,9 +314,9 @@ public final class Engine {
         switch action.type {
         case .move:
             guard let tpl = action.to else { return nil }
-            var dest = URL(fileURLWithPath: expandPath(tpl, context: ctx))
-            var isDir: ObjCBool = false
-            if tpl.hasSuffix("/") || (fm.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue) {
+            var dest = URL(filePath: expandPath(tpl, context: ctx))
+            let destIsDir = (try? dest.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            if tpl.hasSuffix("/") || destIsDir {
                 dest = dest.appendingPathComponent(url.lastPathComponent)
             }
             guard let d = try resolveConflict(at: dest, strategy: action.onConflict ?? .rename) else {
@@ -357,9 +330,9 @@ public final class Engine {
 
         case .fileCopy:
             guard let tpl = action.to else { return nil }
-            var dest = URL(fileURLWithPath: expandPath(tpl, context: ctx))
-            var isDir: ObjCBool = false
-            if tpl.hasSuffix("/") || (fm.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue) {
+            var dest = URL(filePath: expandPath(tpl, context: ctx))
+            let destIsDir = (try? dest.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            if tpl.hasSuffix("/") || destIsDir {
                 dest = dest.appendingPathComponent(url.lastPathComponent)
             }
             guard let d = try resolveConflict(at: dest, strategy: action.onConflict ?? .rename) else {
@@ -392,12 +365,11 @@ public final class Engine {
             guard let cmd = action.command.map({ expandTemplate($0, context: ctx) }) else { return nil }
             if dryRun { Logger.info("    [dry-run] RUN: \(cmd)"); return nil }
             Logger.info("    RUN: \(cmd)")
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-c", cmd]
-            p.environment = ProcessInfo.processInfo.environment.merging([
+            let env = ProcessInfo.processInfo.environment.merging([
                 "DOUMI_FILE": url.path, "DOUMI_NAME": ctx.stem, "DOUMI_EXT": ctx.ext,
             ]) { $1 }
-            try p.run(); p.waitUntilExit()
-            if p.terminationStatus != 0 { Logger.warn("    command exited \(p.terminationStatus)") }
+            let status = runProcess("/bin/sh", args: ["-c", cmd], env: env).status
+            if status != 0 { Logger.warn("    command exited \(status)") }
             return nil
 
         case .notify:
@@ -406,9 +378,8 @@ public final class Engine {
             if dryRun { Logger.info("    [dry-run] NOTIFY: \(ttl) – \(msg)"); return nil }
             let esc = msg.replacingOccurrences(of: "\"", with: "\\\"")
             let te  = ttl.replacingOccurrences(of: "\"", with: "\\\"")
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", "display notification \"\(esc)\" with title \"\(te)\""]
-            try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("display notification \"\(esc)\" with title \"\(te)\"")
+            return nil
 
         case .log:
             let msg = action.message.map { expandTemplate($0, context: ctx) } ?? "Processed: \(url.path)"
@@ -416,30 +387,33 @@ public final class Engine {
 
         case .openWith:
             if dryRun { Logger.info("    [dry-run] OPEN"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            p.arguments = action.with.map { ["-a", $0, url.path] } ?? [url.path]
-            try p.run(); return nil
+            let args = action.with.map { ["-a", $0, url.path] } ?? [url.path]
+            runProcess("/usr/bin/open", args: args)
+            return nil
 
         case .removeTags:
             guard let tags = action.message else { return nil }
             if dryRun { Logger.info("    [dry-run] REMOVE TAGS: \(tags)"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            p.arguments = ["-c", "tag --remove \(tags.split(separator:",").map{"'\($0.trimmingCharacters(in:.whitespaces))'"}.joined(separator:" ")) \"\(url.path)\" 2>/dev/null || true"]
-            try? p.run(); p.waitUntilExit(); return nil
+            let tagArg = tags.split(separator: ",")
+                .map { "'\($0.trimmingCharacters(in: .whitespaces))'" }
+                .joined(separator: " ")
+            runProcess("/bin/sh", args: ["-c", "tag --remove \(tagArg) \"\(url.path)\" 2>/dev/null || true"])
+            return nil
 
         case .addComment:
             guard let comment = action.message.map({ expandTemplate($0, context: ctx) }) else { return nil }
             if dryRun { Logger.info("    [dry-run] ADD COMMENT: \(comment)"); return nil }
             let esc = comment.replacingOccurrences(of: "\"", with: "\\\"")
-            let script = "tell app \"Finder\" to set comment of (POSIX file \"\(url.path)\" as alias) to \"\(esc)\""
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("tell app \"Finder\" to set comment of (POSIX file \"\(url.path)\" as alias) to \"\(esc)\"")
+            return nil
 
         case .toggleExtension:
             if dryRun { Logger.info("    [dry-run] TOGGLE EXTENSION"); return nil }
-            let script = "tell app \"Finder\" to set extension hidden of (POSIX file \"\(url.path)\" as alias) to not (extension hidden of (POSIX file \"\(url.path)\" as alias))"
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("""
+                tell app "Finder" to set extension hidden of (POSIX file "\(url.path)" as alias) \
+                to not (extension hidden of (POSIX file "\(url.path)" as alias))
+                """)
+            return nil
 
         case .toggleLock:
             if dryRun { Logger.info("    [dry-run] TOGGLE LOCK"); return nil }
@@ -450,53 +424,45 @@ public final class Engine {
 
         case .archive:
             if dryRun { Logger.info("    [dry-run] ARCHIVE"); return nil }
-            let dest = (action.to.map { expandPath($0, context: ctx) } ?? url.deletingLastPathComponent().path)
+            let dest = action.to.map { expandPath($0, context: ctx) } ?? url.deletingLastPathComponent().path
             let zipName = "\(url.deletingPathExtension().lastPathComponent).zip"
             let zipPath = "\(dest)/\(zipName)"
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            p.arguments = ["-c", "-k", "--keepParent", url.path, zipPath]
-            try p.run(); p.waitUntilExit()
+            runProcess("/usr/bin/ditto", args: ["-c", "-k", "--keepParent", url.path, zipPath])
             Logger.info("    ARCHIVE → \(zipPath)"); return nil
 
         case .unarchive:
             if dryRun { Logger.info("    [dry-run] UNARCHIVE"); return nil }
             let dest = action.to.map { expandPath($0, context: ctx) } ?? url.deletingLastPathComponent().path
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-            p.arguments = ["-x", "-k", url.path, dest]
-            try p.run(); p.waitUntilExit()
+            runProcess("/usr/bin/ditto", args: ["-x", "-k", url.path, dest])
             Logger.info("    UNARCHIVE → \(dest)"); return nil
 
         case .importMusic:
             if dryRun { Logger.info("    [dry-run] IMPORT MUSIC"); return nil }
-            let script = "tell app \"Music\" to add POSIX file \"\(url.path)\""
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("tell app \"Music\" to add POSIX file \"\(url.path)\"")
+            return nil
 
         case .importPhotos:
             if dryRun { Logger.info("    [dry-run] IMPORT PHOTOS"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", "tell app \"Photos\" to import {POSIX file \"\(url.path)\"}"]
-            try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("tell app \"Photos\" to import {POSIX file \"\(url.path)\"}")
+            return nil
 
         case .importTV:
             if dryRun { Logger.info("    [dry-run] IMPORT TV"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", "tell app \"TV\" to add POSIX file \"\(url.path)\""]
-            try? p.run(); p.waitUntilExit(); return nil
+            runAppleScript("tell app \"TV\" to add POSIX file \"\(url.path)\"")
+            return nil
 
         case .runJavaScript:
             guard let script = action.command.map({ expandTemplate($0, context: ctx) }) else { return nil }
             if dryRun { Logger.info("    [dry-run] RUN JS"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-l", "JavaScript", "-e", script]
-            p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
-            try p.run(); p.waitUntilExit(); return nil
+            let env = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+            runJXA(script, env: env)
+            return nil
 
         case .runAutomator:
             guard let wf = action.command else { return nil }
             if dryRun { Logger.info("    [dry-run] RUN AUTOMATOR: \(wf)"); return nil }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/automator")
-            p.arguments = ["-i", url.path, wf]; try p.run(); p.waitUntilExit(); return nil
+            runProcess("/usr/bin/automator", args: ["-i", url.path, wf])
+            return nil
 
         case .continueMatching:
             return nil  // handled at rule level via stop=false
@@ -551,4 +517,86 @@ public func parseDurationSeconds(_ s: String) -> Double? {
     case "y","yr","year","years":      return n*86_400*365
     default: return nil
     }
+}
+
+// MARK: - Process / shell helpers
+
+@discardableResult
+func runProcess(
+    _ executablePath: String,
+    args: [String],
+    env: [String: String]? = nil,
+    captureOutput: Bool = false
+) -> (status: Int32, output: String) {
+    let p = Process()
+    p.executableURL = URL(filePath: executablePath)
+    p.arguments = args
+    if let env { p.environment = env }
+    var outPipe: Pipe?
+    if captureOutput {
+        let o = Pipe()
+        outPipe = o
+        p.standardOutput = o
+        p.standardError = Pipe() // discard stderr
+    }
+    do { try p.run() } catch { return (-1, "") }
+    p.waitUntilExit()
+    let output: String
+    if let outPipe {
+        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        output = String(data: data, encoding: .utf8) ?? ""
+    } else {
+        output = ""
+    }
+    return (p.terminationStatus, output)
+}
+
+@discardableResult
+func runAppleScript(_ source: String, env: [String: String]? = nil, captureOutput: Bool = false) -> (status: Int32, output: String) {
+    runProcess("/usr/bin/osascript", args: ["-e", source], env: env, captureOutput: captureOutput)
+}
+
+@discardableResult
+func runJXA(_ source: String, env: [String: String]? = nil, captureOutput: Bool = false) -> (status: Int32, output: String) {
+    runProcess("/usr/bin/osascript", args: ["-l", "JavaScript", "-e", source], env: env, captureOutput: captureOutput)
+}
+
+// MARK: - Glob matching
+
+/// Case-insensitive glob via `fnmatch(3)`, matching the prior `LIKE[c]` semantics.
+func globMatch(pattern: String, name: String) -> Bool {
+    name.withCString { nptr in
+        pattern.withCString { pptr in
+            fnmatch(pptr, nptr, FNM_CASEFOLD) == 0
+        }
+    }
+}
+
+// MARK: - Regex helper
+
+func regexMatch(_ pattern: String, in text: String) -> Bool {
+    guard let r = try? Regex(pattern) else { return false }
+    return text.contains(r)
+}
+
+// MARK: - Spotlight "Where From" via getxattr
+
+/// Reads `kMDItemWhereFroms` directly via `getxattr` and decodes the binary plist.
+func sourceURLs(forFile path: String) -> [String] {
+    let attrName = "com.apple.metadata:kMDItemWhereFroms"
+    let size: Int = path.withCString { pp in
+        attrName.withCString { ap in getxattr(pp, ap, nil, 0, 0, 0) }
+    }
+    guard size > 0 else { return [] }
+    var buffer = [UInt8](repeating: 0, count: size)
+    let read: Int = buffer.withUnsafeMutableBytes { raw in
+        guard let base = raw.baseAddress else { return -1 }
+        return path.withCString { pp in
+            attrName.withCString { ap in getxattr(pp, ap, base, size, 0, 0) }
+        }
+    }
+    guard read > 0 else { return [] }
+    let data = Data(buffer.prefix(read))
+    let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+    return (plist as? [String]) ?? []
 }

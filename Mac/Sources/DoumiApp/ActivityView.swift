@@ -2,7 +2,7 @@ import SwiftUI
 import DoumiCore
 
 struct ActivityView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @State private var searchText = ""
     @State private var filterLevel: FilterLevel = .all
 
@@ -153,9 +153,8 @@ struct LogEntryRow: View {
     }
 
     private func cleanMessage(_ msg: String) -> String {
-        // Strip timestamp prefix "[HH:mm:ss]      "
-        if let range = msg.range(of: #"^\[\d{2}:\d{2}:\d{2}\]\s+"#, options: .regularExpression) {
-            return String(msg[range.upperBound...])
+        if let m = msg.firstMatch(of: /^\[\d{2}:\d{2}:\d{2}\]\s+/) {
+            return String(msg[m.range.upperBound...])
         }
         return msg
     }
@@ -165,7 +164,6 @@ struct LogEntryRow: View {
         if diff < 10   { return "just now" }
         if diff < 60   { return "\(Int(diff))s ago" }
         if diff < 3600 { return "\(Int(diff/60))m ago" }
-        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
-        return f.string(from: date)
+        return date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
     }
 }

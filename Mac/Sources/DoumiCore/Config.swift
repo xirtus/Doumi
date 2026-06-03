@@ -1,15 +1,15 @@
-import Foundation
-import Yams
+public import Foundation
+internal import Yams
 
 // MARK: - Top-level
 
-public struct DoumiConfig: Codable {
+public struct DoumiConfig: Codable, Sendable {
     public var global: GlobalConfig = .init()
     public var watch: [WatcherConfig] = []
     public init() {}
 }
 
-public struct TrashSettings: Codable, Equatable {
+public struct TrashSettings: Codable, Equatable, Sendable {
     public var scheduledDeletion: Bool = false
     public var deleteAfterDays: Int = 30
     public var sizeBasedDeletion: Bool = false
@@ -23,7 +23,7 @@ public struct TrashSettings: Codable, Equatable {
     }
 }
 
-public struct GlobalConfig: Codable {
+public struct GlobalConfig: Codable, Sendable {
     public var dryRun: Bool = false
     public var logLevel: LogLevel = .info
     public var trash: TrashSettings = .init()
@@ -33,15 +33,17 @@ public struct GlobalConfig: Codable {
     }
 }
 
-public enum LogLevel: String, Codable, CaseIterable, Comparable {
+public enum LogLevel: String, Codable, CaseIterable, Comparable, Sendable {
     case debug, info, warn, error
-    static private let order: [LogLevel] = [.debug, .info, .warn, .error]
-    public static func < (l: Self, r: Self) -> Bool {
-        order.firstIndex(of: l)! < order.firstIndex(of: r)!
+    private var rank: Int {
+        switch self {
+        case .debug: 0; case .info: 1; case .warn: 2; case .error: 3
+        }
     }
+    public static func < (l: Self, r: Self) -> Bool { l.rank < r.rank }
 }
 
-public struct WatcherConfig: Codable, Identifiable {
+public struct WatcherConfig: Codable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var name: String?
     public var path: String
@@ -54,7 +56,7 @@ public struct WatcherConfig: Codable, Identifiable {
     }
 }
 
-public struct RuleConfig: Codable, Identifiable {
+public struct RuleConfig: Codable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var name: String?
     public var match: MatchMode = .all
@@ -68,11 +70,11 @@ public struct RuleConfig: Codable, Identifiable {
     }
 }
 
-public enum MatchMode: String, Codable { case all, any, none }
+public enum MatchMode: String, Codable, Sendable { case all, any, none }
 
 // MARK: - Conditions
 
-public struct Condition: Codable {
+public struct Condition: Codable, Sendable {
     public let type: ConditionType
     public var glob: String?; public var regex: String?; public var equals: String?
     public var contains: String?; public var startsWith: String?; public var endsWith: String?
@@ -108,7 +110,7 @@ public struct Condition: Codable {
     }
 }
 
-public enum ConditionType: String, Codable {
+public enum ConditionType: String, Codable, Sendable {
     case name; case ext = "extension"; case size, age, kind, script, tags
     case fullName    = "full_name"
     case colorLabel  = "color_label"
@@ -123,11 +125,11 @@ public enum ConditionType: String, Codable {
     case passesAppleScript = "passes_applescript"
     case passesJavaScript  = "passes_javascript"
 }
-public enum AgeBasis: String, Codable { case modified, created }
+public enum AgeBasis: String, Codable, Sendable { case modified, created }
 
 // MARK: - Actions
 
-public struct Action: Codable {
+public struct Action: Codable, Sendable {
     public let type: ActionType
     public var to: String?; public var createDirs: Bool?; public var onConflict: ConflictStrategy?
     public var command: String?; public var message: String?; public var title: String?
@@ -139,7 +141,7 @@ public struct Action: Codable {
     }
 }
 
-public enum ActionType: String, Codable {
+public enum ActionType: String, Codable, Sendable {
     case move; case fileCopy = "copy"; case rename; case trash; case delete
     case run; case notify; case log; case openWith = "open"
     case removeTags      = "remove_tags"
@@ -155,19 +157,19 @@ public enum ActionType: String, Codable {
     case runAutomator    = "run_automator"
     case continueMatching = "continue_matching"
 }
-public enum ConflictStrategy: String, Codable { case rename, skip, overwrite, error }
+public enum ConflictStrategy: String, Codable, Sendable { case rename, skip, overwrite, error }
 
 // MARK: - Custom decoders
 
 extension DoumiConfig {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CK.self)
         global = try c.decodeIfPresent(GlobalConfig.self, forKey: .global) ?? .init()
         watch  = try c.decodeIfPresent([WatcherConfig].self, forKey: .watch) ?? []
     }
     private enum CK: String, CodingKey { case global, watch }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CK.self)
         try c.encode(global, forKey: .global)
         try c.encode(watch, forKey: .watch)
@@ -175,14 +177,14 @@ extension DoumiConfig {
 }
 
 extension GlobalConfig {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         dryRun   = try c.decodeIfPresent(Bool.self, forKey: .dryRun) ?? false
         logLevel = try c.decodeIfPresent(LogLevel.self, forKey: .logLevel) ?? .info
         trash    = try c.decodeIfPresent(TrashSettings.self, forKey: .trash) ?? .init()
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(dryRun, forKey: .dryRun)
         try c.encode(logLevel, forKey: .logLevel)
@@ -193,7 +195,7 @@ extension GlobalConfig {
 }
 
 extension WatcherConfig {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id        = UUID()
         name      = try c.decodeIfPresent(String.self, forKey: .name)
@@ -205,7 +207,7 @@ extension WatcherConfig {
 }
 
 extension RuleConfig {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id         = UUID()
         name       = try c.decodeIfPresent(String.self, forKey: .name)
@@ -218,7 +220,7 @@ extension RuleConfig {
 }
 
 extension Condition {
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(type, forKey: .type)
         try c.encodeIfPresent(glob, forKey: .glob)
@@ -256,7 +258,7 @@ extension Condition {
 }
 
 extension Action {
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(type, forKey: .type)
         try c.encodeIfPresent(to, forKey: .to)

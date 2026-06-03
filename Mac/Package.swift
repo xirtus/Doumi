@@ -1,5 +1,13 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
+
+let upcomingFeatures: [SwiftSetting] = [
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
 
 let package = Package(
     name: "Doumi",
@@ -13,7 +21,8 @@ let package = Package(
         .target(
             name: "DoumiCore",
             dependencies: [.product(name: "Yams", package: "Yams")],
-            path: "Sources/DoumiCore"
+            path: "Sources/DoumiCore",
+            swiftSettings: upcomingFeatures
         ),
 
         // CLI tool: `doumi`
@@ -23,14 +32,17 @@ let package = Package(
                 "DoumiCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/doumi"
+            path: "Sources/doumi",
+            swiftSettings: upcomingFeatures
         ),
 
         // GUI app: `DoumiApp`
         .executableTarget(
             name: "DoumiApp",
             dependencies: ["DoumiCore"],
-            path: "Sources/DoumiApp"
+            path: "Sources/DoumiApp",
+            swiftSettings: upcomingFeatures
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

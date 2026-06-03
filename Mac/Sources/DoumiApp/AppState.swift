@@ -1,8 +1,9 @@
 import Foundation
 import AppKit
-@preconcurrency import DoumiCore
+import Observation
+import DoumiCore
 
-struct LogEntry: Identifiable {
+struct LogEntry: Identifiable, Sendable {
     let id = UUID()
     let date = Date()
     let message: String
@@ -11,24 +12,25 @@ struct LogEntry: Identifiable {
 }
 
 @MainActor
-final class AppState: ObservableObject {
-    @Published var config: DoumiConfig = .init()
-    @Published var isRunning = false
-    @Published var previewMode = false
-    @Published var activityLog: [LogEntry] = []
-    @Published var configURL: URL = DoumiConfig.defaultConfigURL()
-    @Published var selectedWatcher: WatcherConfig? = nil
-    @Published var errorMessage: String? = nil
+@Observable
+final class AppState {
+    var config: DoumiConfig = .init()
+    var isRunning = false
+    var previewMode = false
+    var activityLog: [LogEntry] = []
+    var configURL: URL = DoumiConfig.defaultConfigURL()
+    var selectedWatcher: WatcherConfig? = nil
+    var errorMessage: String? = nil
 
     // Pending settings (edited in SettingsView, applied on save)
-    @Published var pendingDryRun: Bool = false
-    @Published var pendingLogLevel: LogLevel = .info
-    @Published var pendingTrash: TrashSettings = .init()
-    @Published var pendingSettingsChanges: Bool = false
+    var pendingDryRun: Bool = false
+    var pendingLogLevel: LogLevel = .info
+    var pendingTrash: TrashSettings = .init()
+    var pendingSettingsChanges: Bool = false
 
-    private var engine: Engine?
-    private var fsWatcher: DirectoryWatcher?
-    private var trashTimer: Timer?
+    @ObservationIgnored private var engine: Engine?
+    @ObservationIgnored private var fsWatcher: DirectoryWatcher?
+    @ObservationIgnored private var trashTimer: Timer?
 
     init() {
         reloadConfig()
@@ -86,7 +88,7 @@ final class AppState: ObservableObject {
         let cfg = self.config
         let dry = previewMode || cfg.global.dryRun
         let watchers = watcher.map { [$0] } ?? cfg.watch.filter { $0.enabled }
-        DispatchQueue.global(qos: .utility).async {
+        Task.detached(priority: .utility) {
             let eng = Engine(config: cfg, dryRun: dry)
             for w in watchers { eng.scanDirectory(watcher: w) }
         }
@@ -178,7 +180,7 @@ final class AppState: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a folder for Doumi to watch"
         panel.prompt = "Add Folder"
-        panel.begin { [weak self] response in
+        panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor [weak self] in self?.appendFolderToConfig(url: url) }
         }
@@ -334,7 +336,7 @@ watch:
     private func setupLogSink() {
         Logger.level = config.global.logLevel
         Logger.sink = { [weak self] line in
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 let icon: String
                 let lower = line.lowercased()
@@ -349,9 +351,8 @@ watch:
                 else { icon = "info.circle.fill" }
 
                 let filename: String
-                if let range = line.range(of: "✓ rule '.*': (.+)", options: .regularExpression),
-                   let fn = line[range].components(separatedBy: ": ").last {
-                    filename = fn
+                if let match = line.firstMatch(of: /✓ rule '[^']*': (.+)/) {
+                    filename = String(match.output.1)
                 } else { filename = "" }
 
                 let entry = LogEntry(message: line, actionIcon: icon, filename: filename)

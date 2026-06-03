@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 import DoumiCore
 
 // MARK: - Condition field enum (all Hazel-parity fields)
@@ -557,7 +558,7 @@ struct ActionDraft: Identifiable {
 // MARK: - Rule Editor View
 
 struct RuleEditorView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
 
     let initialFolderPath: String?

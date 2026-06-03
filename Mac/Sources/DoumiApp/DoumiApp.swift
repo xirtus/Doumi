@@ -3,13 +3,13 @@ import DoumiCore
 
 @main
 struct DoumiMainApp: App {
-    @StateObject private var appState = AppState()
+    @State private var appState = AppState()
 
     var body: some Scene {
         // Main preferences window
         WindowGroup("Doumi") {
             ContentView()
-                .environmentObject(appState)
+                .environment(appState)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -30,14 +30,14 @@ struct DoumiMainApp: App {
         // Settings window — opened via Cmd+, or App menu → Settings
         Settings {
             SettingsView()
-                .environmentObject(appState)
+                .environment(appState)
                 .frame(minWidth: 480, minHeight: 360)
         }
 
         // Detached watcher window (opened via openWindow)
         WindowGroup("Watcher", id: "watcher-detail", for: String.self) { $watcherID in
             DetachedWatcherView(watcherID: watcherID ?? "")
-                .environmentObject(appState)
+                .environment(appState)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -46,7 +46,7 @@ struct DoumiMainApp: App {
         // Menu bar item
         MenuBarExtra {
             MenuBarContent()
-                .environmentObject(appState)
+                .environment(appState)
         } label: {
             Image(systemName: appState.previewMode
                   ? "eye.circle.fill"
@@ -65,7 +65,7 @@ struct DoumiMainApp: App {
 
 struct DetachedWatcherView: View {
     let watcherID: String
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
 
     var watcher: WatcherConfig? {
         state.config.watch.first { $0.id.uuidString == watcherID }

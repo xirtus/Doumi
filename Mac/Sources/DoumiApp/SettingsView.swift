@@ -2,7 +2,7 @@ import SwiftUI
 import DoumiCore
 
 struct SettingsView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
 
     var body: some View {
         Form {
@@ -183,8 +183,8 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section("About") {
-            LabeledContent("Version", value: "0.1.0")
-            LabeledContent("License", value: "MIT")
+            LabeledContent("Version", value: "0.1.1")
+            LabeledContent("License", value: "GPL 3.0")
             LabeledContent("Source") {
                 Link("github.com/your-org/Doumi",
                      destination: URL(string: "https://github.com")!)
@@ -223,14 +223,14 @@ struct SettingsView: View {
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let path = "\(dir)/com.doumi.app.plist"
         try? plist.write(toFile: path, atomically: true, encoding: .utf8)
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        let p = Process(); p.executableURL = URL(filePath: "/bin/launchctl")
         p.arguments = ["load", path]; try? p.run(); p.waitUntilExit()
     }
 
     private func uninstallLaunchAgent() {
         let path = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/com.doumi.app.plist").path
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        let p = Process(); p.executableURL = URL(filePath: "/bin/launchctl")
         p.arguments = ["unload", path]; try? p.run(); p.waitUntilExit()
         try? FileManager.default.removeItem(atPath: path)
     }

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Doumi
+GenericName=File Organizer
+Comment=Intelligent file organization rules for Linux
+Exec=doumi gui
+Icon=doumi
+Terminal=false
+Type=Application
+Categories=Utility;FileManager;
+Keywords=file;organize;automate;rules;hazel;
+StartupWMClass=doumi

@@ -1,0 +1,29 @@
+[package]
+name = "doumi-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
+shellexpand = { workspace = true }
+regex = { workspace = true }
+glob = { workspace = true }
+walkdir = { workspace = true }
+infer = { workspace = true }
+trash = { workspace = true }
+zip = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
+bzip2 = { workspace = true }
+xattr = { workspace = true }
+notify-rust = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

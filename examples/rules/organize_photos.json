@@ -1,0 +1,48 @@
+{
+  "id": "organize-photos",
+  "name": "Organize Photos by Date",
+  "description": "Sort image files from Downloads into ~/Pictures/YYYY/MM-MonthName",
+  "enabled": true,
+  "priority": 1,
+  "folders": [
+    {
+      "path": "~/Downloads",
+      "recursive": false
+    },
+    {
+      "path": "~/Desktop",
+      "recursive": false
+    }
+  ],
+  "triggers": {
+    "on_add": true,
+    "on_modify": false,
+    "on_delete": false,
+    "schedule": null
+  },
+  "conditions": {
+    "type": "group",
+    "match": "all",
+    "items": [
+      {
+        "type": "kind",
+        "operator": "is",
+        "value": "image"
+      },
+      {
+        "type": "extension",
+        "operator": "is_one_of",
+        "value": ["jpg", "jpeg", "png", "heic", "raw", "cr2", "nef", "webp", "gif"]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "move",
+      "destination": "~/Pictures/{year}/{month}-{month_name}",
+      "on_conflict": "rename",
+      "create_parents": true
+    }
+  ],
+  "continue_matching": false
+}

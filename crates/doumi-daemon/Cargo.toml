@@ -1,0 +1,33 @@
+[package]
+name = "doumid"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "doumid"
+path = "src/main.rs"
+
+[dependencies]
+doumi-core = { path = "../doumi-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = { workspace = true }
+shellexpand = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-mini = { workspace = true }
+rusqlite = { workspace = true }
+walkdir = { workspace = true }
+tokio-cron-scheduler = { workspace = true }
+clap = { workspace = true }
+glob = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+# Stop any running doumid daemons gracefully
+if command -v systemctl >/dev/null 2>&1; then
+    for uid in $(cut -d: -f3 /etc/passwd); do
+        if [ "$uid" -ge 1000 ] 2>/dev/null; then
+            su -s /bin/sh -c "XDG_RUNTIME_DIR=/run/user/$uid systemctl --user stop doumi.service 2>/dev/null || true" "$(id -nu "$uid" 2>/dev/null)" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Also try pkill as fallback
+pkill -f doumid 2>/dev/null || true

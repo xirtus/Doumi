@@ -1,0 +1,24 @@
+Package: doumi
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.6), libc6 (>= 2.34)
+Recommends: systemd
+Maintainer: Doumi Project <doumi@example.com>
+Homepage: https://github.com/doumi/doumi
+Description: Intelligent file organizer for Linux
+ Doumi is an intelligent file organization tool that watches folders
+ and applies user-defined rules to automatically sort, rename, and
+ manage files.
+ .
+ Features:
+  - Rule-based file matching (extension, name, date, size, kind, etc.)
+  - Real-time filesystem watching via inotify
+  - Scheduled rule execution via cron expressions
+  - Safety checks: skip system dirs, project roots, symlinks to external
+  - Dry-run mode to preview actions before committing
+  - GTK4 GUI for visual rule editing (hazel-like interface)
+  - CLI for scripting and headless use
+  - Systemd user service for background daemon
+  - Action logging and preview

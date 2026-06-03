@@ -1,0 +1,134 @@
+/* ── Doumi custom stylesheet ──────────────────────────────────────────────── */
+
+/* Rule list row: colored left accent bar */
+.rule-row {
+  border-left: 3px solid transparent;
+  padding-left: 3px;
+}
+.rule-row.enabled {
+  border-left-color: #26a269;
+}
+.rule-row.disabled {
+  border-left-color: transparent;
+}
+.rule-row.selected {
+  border-left-color: @accent_color;
+}
+
+/* Sidebar search bar */
+.sidebar-search {
+  margin: 6px 8px 2px 8px;
+}
+
+/* Dashboard stat cards */
+.stat-card {
+  border-radius: 12px;
+  padding: 16px 20px;
+  background: alpha(@card_bg_color, 0.9);
+}
+.stat-card .stat-number {
+  font-size: 32px;
+  font-weight: 800;
+  color: @accent_color;
+}
+.stat-card .stat-label {
+  font-size: 12px;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Action tag chips */
+.action-chip {
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: alpha(@accent_color, 0.15);
+  color: @accent_color;
+}
+.action-chip.destructive {
+  background: alpha(@destructive_color, 0.15);
+  color: @destructive_color;
+}
+
+/* Log entry rows */
+.log-entry-matched {
+  border-left: 3px solid @success_color;
+}
+.log-entry-failed {
+  border-left: 3px solid @destructive_color;
+}
+.log-entry-dry {
+  border-left: 3px solid @warning_color;
+}
+
+/* Condition tree indentation */
+.condition-group {
+  margin-left: 16px;
+  border-left: 2px solid alpha(@borders, 0.5);
+  padding-left: 8px;
+}
+
+/* Daemon status indicator */
+.status-online { color: @success_color; }
+.status-offline { color: @destructive_color; }
+.status-dot {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* Rule detail header */
+.rule-detail-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+.rule-detail-subtitle {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+/* Folder path pills */
+.folder-pill {
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  background: alpha(@accent_color, 0.10);
+  color: @accent_color;
+}
+
+/* Trigger badge */
+.trigger-badge {
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: alpha(@success_color, 0.15);
+  color: @success_color;
+}
+.trigger-badge.schedule {
+  background: alpha(@warning_color, 0.15);
+  color: @warning_color;
+}
+
+/* Priority indicator */
+.priority-badge {
+  border-radius: 50%;
+  min-width: 22px;
+  min-height: 22px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Empty-state subtitle */
+.empty-subtitle {
+  font-size: 13px;
+  opacity: 0.55;
+  line-height: 1.6;
+}
+
+/* Smooth row hover */
+row.activatable:hover {
+  transition: background 150ms ease;
+}

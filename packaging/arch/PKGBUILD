@@ -1,0 +1,107 @@
+# Maintainer: Doumi Project <doumi@example.com>
+
+pkgname=doumi
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Intelligent file organizer for Linux with rule-based file automation"
+arch=('x86_64')
+url="https://github.com/doumi/doumi"
+license=('MIT')
+depends=('gtk4' 'libadwaita' 'gcc-libs')
+makedepends=('cargo' 'rust')
+optdepends=('systemd: for user-level auto-start of the daemon')
+install=doumi.install
+source=(
+    "${url}/archive/refs/tags/v${pkgver}.tar.gz"
+)
+sha256sums=('SKIP')
+
+prepare() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+
+    # Write .desktop and .service inline so the PKGBUILD is self-contained
+    cat > doumi.desktop << 'DESKTOP'
+[Desktop Entry]
+Name=Doumi
+GenericName=File Organizer
+Comment=Intelligent file organization rules for Linux
+Exec=doumi gui
+Icon=doumi
+Terminal=false
+Type=Application
+Categories=Utility;FileManager;
+Keywords=file;organize;automate;rules;hazel;
+StartupWMClass=doumi
+DESKTOP
+
+    cat > doumi.service << 'UNIT'
+[Unit]
+Description=Doumi file organizer daemon
+Documentation=https://github.com/doumi/doumi
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/doumid
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=doumid
+
+[Install]
+WantedBy=default.target
+UNIT
+
+    cargo fetch --locked --target "${CARCH}-unknown-linux-gnu"
+}
+
+build() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo build --frozen --release
+}
+
+check() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    cargo test --frozen --release || true
+}
+
+package() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+
+    RELEASE_DIR="target/release"
+
+    # ── Binaries ─────────────────────────────────────────────────────────
+    install -Dm755 "${RELEASE_DIR}/doumi"      "${pkgdir}/usr/bin/doumi"
+    install -Dm755 "${RELEASE_DIR}/doumid"     "${pkgdir}/usr/bin/doumid"
+    if [ -f "${RELEASE_DIR}/doumi-gui" ]; then
+        install -Dm755 "${RELEASE_DIR}/doumi-gui" "${pkgdir}/usr/bin/doumi-gui"
+    fi
+    strip --strip-unneeded "${pkgdir}/usr/bin/doumi"   2>/dev/null || true
+    strip --strip-unneeded "${pkgdir}/usr/bin/doumid"  2>/dev/null || true
+
+    # ── Icons ─────────────────────────────────────────────────────────────
+    for size in 16 32 48 64 128 256 512; do
+        src="data/icons/doumi_${size}.png"
+        destdir="${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps"
+        if [ -f "$src" ]; then
+            install -Dm644 "$src" "${destdir}/doumi.png"
+        fi
+    done
+    if [ -f data/icons/doumi.svg ]; then
+        install -Dm644 data/icons/doumi.svg \
+            "${pkgdir}/usr/share/icons/hicolor/scalable/apps/doumi.svg"
+    fi
+
+    # ── Desktop entry ─────────────────────────────────────────────────────
+    install -Dm644 doumi.desktop \
+        "${pkgdir}/usr/share/applications/doumi.desktop"
+
+    # ── Systemd user unit ─────────────────────────────────────────────────
+    install -Dm644 doumi.service \
+        "${pkgdir}/usr/lib/systemd/user/doumi.service"
+
+    # ── License ───────────────────────────────────────────────────────────
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

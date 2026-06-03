@@ -1,0 +1,10 @@
+/target/
+.gpg/
+*.deb
+*.pkg.tar.*
+*.tar.xz
+*.tar.zst
+src/pkg/
+src/*.tar.gz
+!packaging/
+NEXT_AGENT_HANDOFF.md

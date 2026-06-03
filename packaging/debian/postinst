@@ -1,0 +1,33 @@
+#!/bin/sh
+set -e
+
+# Update icon cache
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+fi
+
+# Update desktop database
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database /usr/share/applications 2>/dev/null || true
+fi
+
+# Reload systemd user units if systemd is available
+if command -v systemctl >/dev/null 2>&1; then
+    # Try to reload user units for all logged-in users
+    for uid in $(cut -d: -f3 /etc/passwd); do
+        if [ "$uid" -ge 1000 ] 2>/dev/null; then
+            su -s /bin/sh -c "XDG_RUNTIME_DIR=/run/user/$uid systemctl --user daemon-reload 2>/dev/null || true" "$(id -nu "$uid" 2>/dev/null)" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo ""
+echo "Doumi installed!"
+echo ""
+echo "Quick start:"
+echo "  doumi daemon start            # start the background daemon"
+echo "  doumi rules add MyRule -f ~/Downloads   # create a rule"
+echo "  doumi rules list              # view all rules"
+echo "  doumi gui                     # launch GTK4 visual editor"
+echo "  systemctl --user enable --now doumi     # auto-start daemon on login"
+echo ""

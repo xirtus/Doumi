@@ -1,0 +1,37 @@
+[workspace]
+members = [
+    "crates/doumi-core",
+    "crates/doumi-daemon",
+    "crates/doumi-cli",
+    "crates/doumi-gui",
+]
+resolver = "2"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+dirs = "5"
+shellexpand = "3"
+regex = "1"
+glob = "0.3"
+walkdir = "2"
+notify = "6"
+notify-debouncer-mini = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+infer = "0.16"
+trash = "5"
+zip = "2"
+tar = "0.4"
+flate2 = "1"
+bzip2 = "0.4"
+xattr = "1"
+notify-rust = "4"
+clap = { version = "4", features = ["derive"] }
+tokio-cron-scheduler = "0.13"
+once_cell = "1"

@@ -19,8 +19,19 @@ Rules live in plain YAML files you can edit in any text editor, version-control 
 
 ## Install
 
+### Homebrew Cask (recommended)
+
 ```bash
-# Build from source (requires Xcode Command Line Tools)
+brew tap xirtus/doumi
+brew install --cask doumi
+```
+
+That drops `Doumi.app` into `/Applications` and makes the `doumi` CLI available.
+
+### Build from source
+
+```bash
+# Requires Xcode Command Line Tools
 cd /path/to/Doumi
 swift build -c release
 sudo cp .build/release/doumi /usr/local/bin/

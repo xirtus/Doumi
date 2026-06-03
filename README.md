@@ -1,3 +1,4 @@
+<img width="784" height="657" alt="doumi" src="https://github.com/user-attachments/assets/b6247595-dbf4-42ec-a4a6-3cc3e2ebf3e2" />
 <div align="center">
 
 # Doumi

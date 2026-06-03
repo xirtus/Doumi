@@ -27,6 +27,13 @@ struct DoumiMainApp: App {
             }
         }
 
+        // Settings window — opened via Cmd+, or App menu → Settings
+        Settings {
+            SettingsView()
+                .environmentObject(appState)
+                .frame(minWidth: 480, minHeight: 360)
+        }
+
         // Detached watcher window (opened via openWindow)
         WindowGroup("Watcher", id: "watcher-detail", for: String.self) { $watcherID in
             DetachedWatcherView(watcherID: watcherID ?? "")

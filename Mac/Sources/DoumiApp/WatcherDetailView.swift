@@ -8,6 +8,7 @@ struct WatcherDetailView: View {
     @EnvironmentObject var state: AppState
     @State private var expandedRules: Set<UUID> = []
     @State private var showDisabled = true
+    @State private var showRuleEditor = false
     @Environment(\.openWindow) private var openWindow
 
     private var expandedPath: String {
@@ -62,6 +63,12 @@ struct WatcherDetailView: View {
         .navigationTitle(watcher.name ?? displayPath)
         .navigationSubtitle(watcher.path.replacingOccurrences(
             of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
+        .sheet(isPresented: $showRuleEditor) {
+            RuleEditorView(initialFolderPath: watcher.path) { folderPath, rule in
+                state.addRule(rule, toFolderPath: folderPath)
+            }
+            .environmentObject(state)
+        }
     }
 
     // MARK: - Folder info bar
@@ -109,6 +116,15 @@ struct WatcherDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .help("Reveal in Finder")
+
+                Button {
+                    showRuleEditor = true
+                } label: {
+                    Label("New Rule", systemImage: "plus.square.on.square")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Create a new rule for this folder")
 
                 Button {
                     state.runNow(watcher: watcher)
@@ -164,7 +180,10 @@ struct WatcherDetailView: View {
                         RuleCard(
                             rule: rule,
                             isExpanded: expandedRules.contains(rule.id),
-                            onToggle: { toggleExpand(rule.id) }
+                            onToggle: { toggleExpand(rule.id) },
+                            onEnabledToggle: {
+                                state.toggleRule(rule.id, inWatcher: watcher.id)
+                            }
                         )
                         .contextMenu {
                             ruleContextMenu(rule: rule)
@@ -223,8 +242,7 @@ struct WatcherDetailView: View {
             .font(.headline)
         Divider()
         Button {
-            // Toggle enable/disable would require config write — open editor for now
-            state.openConfigInEditor()
+            state.toggleRule(rule.id, inWatcher: watcher.id)
         } label: {
             Label(rule.enabled ? "Disable Rule" : "Enable Rule",
                   systemImage: rule.enabled ? "pause.circle" : "checkmark.circle")
@@ -236,7 +254,6 @@ struct WatcherDetailView: View {
         }
         Divider()
         Button(role: .destructive) {
-            // Would require config write
             state.openConfigInEditor()
         } label: {
             Label("Delete Rule…", systemImage: "trash")
@@ -289,6 +306,7 @@ struct RuleCard: View {
     let rule: RuleConfig
     let isExpanded: Bool
     let onToggle: () -> Void
+    let onEnabledToggle: () -> Void
 
     @State private var isHovered = false
 
@@ -346,11 +364,16 @@ struct RuleCard: View {
                 // Compact summary chips
                 summaryChips
 
-                // Enabled dot
-                Circle()
-                    .fill(rule.enabled ? Color.green : Color.gray.opacity(0.4))
-                    .frame(width: 7, height: 7)
-                    .help(rule.enabled ? "Rule enabled" : "Rule disabled")
+                // Enable/disable toggle button
+                Button {
+                    onEnabledToggle()
+                } label: {
+                    Image(systemName: rule.enabled ? "power.circle.fill" : "power.circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(rule.enabled ? Color.green : Color.gray.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .help(rule.enabled ? "Click to disable rule" : "Click to enable rule")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -362,13 +385,17 @@ struct RuleCard: View {
     private var ruleAccentColor: Color {
         guard let first = rule.actions.first else { return .gray }
         switch first.type {
-        case .move, .rename: return .blue
-        case .fileCopy:      return .teal
-        case .trash, .delete: return .red
-        case .run:           return .orange
-        case .notify:        return .purple
-        case .log:           return .gray
-        case .openWith:      return .green
+        case .move, .rename:                                     return .blue
+        case .fileCopy:                                          return .teal
+        case .trash, .delete:                                    return .red
+        case .run, .runJavaScript, .runAutomator:                return .orange
+        case .notify:                                            return .purple
+        case .log:                                               return .gray
+        case .openWith:                                          return .green
+        case .removeTags, .addComment, .toggleExtension,
+             .toggleLock, .archive, .unarchive:                  return .indigo
+        case .importMusic, .importPhotos, .importTV:             return .pink
+        case .continueMatching:                                  return .cyan
         }
     }
 
@@ -392,31 +419,53 @@ struct RuleCard: View {
 
     private var primaryActionIcon: String {
         switch rule.actions.first?.type {
-        case .move:     return "arrow.right.circle.fill"
-        case .fileCopy: return "doc.on.doc.fill"
-        case .rename:   return "pencil.circle.fill"
-        case .trash:    return "trash.circle.fill"
-        case .delete:   return "xmark.circle.fill"
-        case .run:      return "terminal.fill"
-        case .notify:   return "bell.fill"
-        case .log:      return "doc.text.fill"
-        case .openWith: return "arrow.up.forward.app.fill"
-        case nil:       return "questionmark.circle.fill"
+        case .move:              return "arrow.right.circle.fill"
+        case .fileCopy:          return "doc.on.doc.fill"
+        case .rename:            return "pencil.circle.fill"
+        case .trash:             return "trash.circle.fill"
+        case .delete:            return "xmark.circle.fill"
+        case .run, .runJavaScript, .runAutomator: return "terminal.fill"
+        case .notify:            return "bell.fill"
+        case .log:               return "doc.text.fill"
+        case .openWith:          return "arrow.up.forward.app.fill"
+        case .removeTags:        return "tag.slash.fill"
+        case .addComment:        return "text.bubble.fill"
+        case .toggleExtension:   return "eye.slash.fill"
+        case .toggleLock:        return "lock.fill"
+        case .archive:           return "archivebox.fill"
+        case .unarchive:         return "archivebox"
+        case .importMusic:       return "music.note"
+        case .importPhotos:      return "photo.fill"
+        case .importTV:          return "tv.fill"
+        case .continueMatching:  return "arrow.down.circle.fill"
+        case nil:                return "questionmark.circle.fill"
         }
     }
 
     private var primaryActionLabel: String {
         guard let a = rule.actions.first else { return "?" }
         switch a.type {
-        case .move:     return a.to.map { shortPath($0) } ?? "move"
-        case .fileCopy: return a.to.map { shortPath($0) } ?? "copy"
-        case .rename:   return a.to ?? "rename"
-        case .trash:    return "Trash"
-        case .delete:   return "Delete"
-        case .run:      return "Script"
-        case .notify:   return "Notify"
-        case .log:      return "Log"
-        case .openWith: return a.with ?? "Open"
+        case .move:              return a.to.map { shortPath($0) } ?? "move"
+        case .fileCopy:          return a.to.map { shortPath($0) } ?? "copy"
+        case .rename:            return a.to ?? "rename"
+        case .trash:             return "Trash"
+        case .delete:            return "Delete"
+        case .run:               return "Script"
+        case .runJavaScript:     return "JavaScript"
+        case .runAutomator:      return "Automator"
+        case .notify:            return "Notify"
+        case .log:               return "Log"
+        case .openWith:          return a.with ?? "Open"
+        case .removeTags:        return "Remove Tags"
+        case .addComment:        return "Comment"
+        case .toggleExtension:   return "Ext Toggle"
+        case .toggleLock:        return "Lock Toggle"
+        case .archive:           return "Archive"
+        case .unarchive:         return "Unarchive"
+        case .importMusic:       return "→ Music"
+        case .importPhotos:      return "→ Photos"
+        case .importTV:          return "→ TV"
+        case .continueMatching:  return "Continue"
         }
     }
 
@@ -440,7 +489,7 @@ struct RuleCard: View {
             if !rule.conditions.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     rowSectionHeader(
-                        "IF \(rule.match == .all ? "ALL" : "ANY")",
+                        "IF \(rule.match == .all ? "ALL" : rule.match == .any ? "ANY" : "NONE")",
                         icon: "questionmark.circle.fill", color: .blue)
                     ForEach(Array(rule.conditions.enumerated()), id: \.offset) { _, c in
                         conditionRow(c)
@@ -514,13 +563,21 @@ struct RuleCard: View {
 
     private func conditionIcon(_ t: ConditionType) -> String {
         switch t {
-        case .name:   return "textformat.characters"
-        case .ext:    return "doc.badge.ellipsis"
-        case .size:   return "scalemass"
-        case .age:    return "clock"
-        case .kind:   return "folder"
-        case .script: return "terminal"
-        case .tags:   return "tag"
+        case .name, .fullName:        return "textformat.characters"
+        case .ext:                    return "doc.badge.ellipsis"
+        case .size:                   return "scalemass"
+        case .age, .currentTime:      return "clock"
+        case .kind:                   return "folder"
+        case .script, .passesAppleScript, .passesJavaScript: return "terminal"
+        case .tags:                   return "tag"
+        case .colorLabel:             return "paintpalette"
+        case .comment:                return "text.bubble"
+        case .locked:                 return "lock"
+        case .contents:               return "doc.text.magnifyingglass"
+        case .sourceURL:              return "link"
+        case .subfolderDepth:         return "arrow.down.right"
+        case .subItemCount:           return "number.square"
+        case .anyFile:                return "asterisk"
         }
     }
 
@@ -547,9 +604,19 @@ struct RuleCard: View {
             let parts = [c.olderThan.map{"older than \($0)"},
                          c.newerThan.map{"newer than \($0)"}].compactMap{$0}
             return parts.isEmpty ? "age condition" : parts.joined(separator: ", ")
-        case .kind:   return "is a \(c.equals ?? "file")"
-        case .script: return "script: \(c.run ?? "")"
-        case .tags:   return "has tags: \(c.oneOf?.joined(separator: ", ") ?? "")"
+        case .kind:          return "is a \(c.equals ?? "file")"
+        case .script, .passesAppleScript, .passesJavaScript: return "script: \(c.run ?? "")"
+        case .tags:          return "has tags: \(c.oneOf?.joined(separator: ", ") ?? "")"
+        case .fullName:      if let s = c.contains { return "full name contains \"\(s)\"" }; return "full name condition"
+        case .colorLabel:    return "color label is \(c.colorLabelValue.map { String($0) } ?? "?")"
+        case .comment:       if let s = c.contains { return "comment contains \"\(s)\"" }; return "comment condition"
+        case .locked:        return c.locked == true ? "is locked" : "is not locked"
+        case .contents:      if let s = c.contains { return "contents contain \"\(s)\"" }; return "contents condition"
+        case .sourceURL:     if let s = c.contains { return "source URL contains \"\(s)\"" }; return "source URL condition"
+        case .subfolderDepth: return "subfolder depth \(c.gt.map { "> \($0)" } ?? c.equals.map { "= \($0)" } ?? "condition")"
+        case .subItemCount:  return "item count \(c.gt.map { "> \($0)" } ?? c.equals.map { "= \($0)" } ?? "condition")"
+        case .anyFile:       return "any file"
+        case .currentTime:   if let t = c.atTime { return "current time is \(t)" }; return "current time condition"
         }
     }
 
@@ -560,10 +627,22 @@ struct RuleCard: View {
         case .rename:   return "Rename → \"\(a.to ?? "(no template)")\""
         case .trash:    return "Move to Trash"
         case .delete:   return "Delete permanently"
-        case .run:      return "Run: \(a.command ?? "")"
-        case .notify:   return "Notify: \"\(a.message ?? "")\""
-        case .log:      return "Log: \(a.message ?? "file path")"
-        case .openWith: return a.with.map {"Open with \($0)"} ?? "Open with default app"
+        case .run:              return "Run: \(a.command ?? "")"
+        case .runJavaScript:    return "Run JavaScript"
+        case .runAutomator:     return "Run Automator: \(a.command ?? "")"
+        case .notify:           return "Notify: \"\(a.message ?? "")\""
+        case .log:              return "Log: \(a.message ?? "file path")"
+        case .openWith:         return a.with.map { "Open with \($0)" } ?? "Open with default app"
+        case .removeTags:       return "Remove tags: \(a.message ?? "")"
+        case .addComment:       return "Add comment: \"\(a.message ?? "")\""
+        case .toggleExtension:  return "Toggle extension visibility"
+        case .toggleLock:       return "Toggle lock"
+        case .archive:          return "Archive to zip"
+        case .unarchive:        return "Unarchive"
+        case .importMusic:      return "Import into Music"
+        case .importPhotos:     return "Import into Photos"
+        case .importTV:         return "Import into TV"
+        case .continueMatching: return "Continue matching rules"
         }
     }
 }

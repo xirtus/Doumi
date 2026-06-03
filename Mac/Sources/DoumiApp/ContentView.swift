@@ -6,18 +6,58 @@ struct ContentView: View {
     @EnvironmentObject var state: AppState
     @State private var selection: SidebarItem? = .watchers
     @State private var ruleSearch = ""
+    @State private var pendingSelection: SidebarItem? = nil
+    @State private var showUnsavedSettingsAlert = false
+    @State private var showRuleEditor = false
     @Environment(\.openWindow) private var openWindow
 
     enum SidebarItem: Hashable { case watchers, activity, settings }
 
+    private var sidebarSelection: Binding<SidebarItem?> {
+        Binding(
+            get: { selection },
+            set: { newValue in
+                if selection == .settings && state.pendingSettingsChanges && newValue != .settings {
+                    pendingSelection = newValue
+                    showUnsavedSettingsAlert = true
+                } else {
+                    selection = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $selection)
+            SidebarView(selection: sidebarSelection)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 290)
         } detail: {
             detailView
         }
         .frame(minWidth: 800, minHeight: 540)
+        .sheet(isPresented: $showRuleEditor) {
+            RuleEditorView(initialFolderPath: state.selectedWatcher?.path) { folderPath, rule in
+                state.addRule(rule, toFolderPath: folderPath)
+            }
+            .environmentObject(state)
+        }
+        .alert("Unsaved Settings", isPresented: $showUnsavedSettingsAlert) {
+            Button("Save & Continue") {
+                state.applyPendingSettings()
+                selection = pendingSelection
+                pendingSelection = nil
+            }
+            Button("Discard & Continue", role: .destructive) {
+                state.discardPendingSettings()
+                selection = pendingSelection
+                pendingSelection = nil
+            }
+            Button("Stay", role: .cancel) {
+                pendingSelection = nil
+            }
+        } message: {
+            Text("You have unsaved changes to settings.")
+        }
         // ── Global toolbar ──────────────────────────────────────────
         .toolbar {
             // ── Group A: CREATE ──────────────────────────────────
@@ -31,21 +71,12 @@ struct ContentView: View {
             }
 
             ToolbarItem(id: "new-rule", placement: .navigation) {
-                Menu {
-                    Button {
-                        state.openConfigInEditor()
-                    } label: {
-                        Label("New Rule in Current Folder", systemImage: "text.badge.plus")
-                    }
-                    Button {
-                        state.openConfigInEditor()
-                    } label: {
-                        Label("New Rule Group", systemImage: "folder.badge.plus")
-                    }
+                Button {
+                    showRuleEditor = true
                 } label: {
                     Label("New Rule", systemImage: "plus.square.on.square")
                 }
-                .help("Add a rule or rule group")
+                .help("Create a new rule")
             }
 
             // ── Group B: CONTROL ─────────────────────────────────

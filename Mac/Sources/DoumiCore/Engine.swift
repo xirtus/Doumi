@@ -54,20 +54,33 @@ public final class Engine {
     private func matchesRule(url: URL, rule: RuleConfig) -> Bool {
         if rule.conditions.isEmpty { return true }
         switch rule.match {
-        case .all: return rule.conditions.allSatisfy { checkCondition(url: url, c: $0) }
-        case .any: return rule.conditions.contains  { checkCondition(url: url, c: $0) }
+        case .all:  return rule.conditions.allSatisfy { checkCondition(url: url, c: $0) }
+        case .any:  return rule.conditions.contains   { checkCondition(url: url, c: $0) }
+        case .none: return !rule.conditions.contains  { checkCondition(url: url, c: $0) }
         }
     }
 
     private func checkCondition(url: URL, c: Condition) -> Bool {
         switch c.type {
-        case .name:   return checkName(url: url, c: c)
-        case .ext:    return checkExtension(url: url, c: c)
-        case .size:   return checkSize(url: url, c: c)
-        case .age:    return checkAge(url: url, c: c)
-        case .kind:   return checkKind(url: url, c: c)
-        case .script: return checkScript(url: url, c: c)
-        case .tags:   return checkTags(url: url, c: c)
+        case .name:              return checkName(url: url, c: c)
+        case .fullName:          return checkFullName(url: url, c: c)
+        case .ext:               return checkExtension(url: url, c: c)
+        case .size:              return checkSize(url: url, c: c)
+        case .age:               return checkAge(url: url, c: c)
+        case .kind:              return checkKind(url: url, c: c)
+        case .script:            return checkScript(url: url, c: c)
+        case .tags:              return checkTags(url: url, c: c)
+        case .colorLabel:        return checkColorLabel(url: url, c: c)
+        case .comment:           return checkComment(url: url, c: c)
+        case .locked:            return checkLocked(url: url, c: c)
+        case .contents:          return checkContents(url: url, c: c)
+        case .sourceURL:         return checkSourceURL(url: url, c: c)
+        case .subfolderDepth:    return checkDepth(url: url, c: c)
+        case .subItemCount:      return checkItemCount(url: url, c: c)
+        case .anyFile:           return true
+        case .currentTime:       return checkCurrentTime(c: c)
+        case .passesAppleScript: return checkAppleScript(url: url, c: c)
+        case .passesJavaScript:  return checkJavaScript(url: url, c: c)
         }
     }
 
@@ -109,10 +122,175 @@ public final class Engine {
         let key: FileAttributeKey = (c.basis ?? .modified) == .created ? .creationDate : .modificationDate
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let date = attrs[key] as? Date else { return false }
-        let age = Date().timeIntervalSince(date)
-        if let s = c.olderThan, let n = parseDurationSeconds(s), age < n { return false }
-        if let s = c.newerThan, let n = parseDurationSeconds(s), age > n { return false }
+        let age = Date().timeIntervalSince(date)  // positive = past, negative = future
+        if let s = c.olderThan,    let n = parseDurationSeconds(s), age < n  { return false }
+        if let s = c.newerThan,    let n = parseDurationSeconds(s), age > n  { return false }
+        if let s = c.inTheNext,    let n = parseDurationSeconds(s), age > -n { return false }  // must be within next n
+        if let s = c.notInTheNext, let n = parseDurationSeconds(s), age < 0 && age >= -n { return false }
+        if let iso = c.beforeDate, let d = parseISODate(iso), date >= d      { return false }
+        if let iso = c.afterDate,  let d = parseISODate(iso), date <= d      { return false }
+        if c.isBlank == true  { return false }
+        if c.isBlank == false { return true }
+        if let atT = c.atTime, !matchesTimeOfDay(date: date, timeStr: atT, mode: .equals)  { return false }
+        if let bT  = c.beforeTime, !matchesTimeOfDay(date: date, timeStr: bT, mode: .before) { return false }
+        if let aT  = c.afterTime,  !matchesTimeOfDay(date: date, timeStr: aT, mode: .after)  { return false }
         return true
+    }
+
+    private enum TimeMode { case equals, before, after }
+    private func matchesTimeOfDay(date: Date, timeStr: String, mode: TimeMode) -> Bool {
+        let parts = timeStr.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return false }
+        let cal = Calendar.current
+        let fileH = cal.component(.hour, from: date)
+        let fileM = cal.component(.minute, from: date)
+        let fileTotal = fileH * 60 + fileM
+        let target = parts[0] * 60 + parts[1]
+        switch mode {
+        case .equals: return abs(fileTotal - target) <= 1
+        case .before: return fileTotal < target
+        case .after:  return fileTotal > target
+        }
+    }
+
+    private func parseISODate(_ s: String) -> Date? {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
+        return f.date(from: s)
+    }
+
+    private func checkFullName(url: URL, c: Condition) -> Bool {
+        let name = url.lastPathComponent
+        if let p = c.glob,     !NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
+        if let p = c.notGlob,   NSPredicate(format:"self LIKE[c] %@",p).evaluate(with:name) { return false }
+        if let r = c.regex {
+            guard let re = try? NSRegularExpression(pattern: r),
+                  re.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil else { return false }
+        }
+        if let e = c.equals,      name.lowercased() != e.lowercased()                { return false }
+        if let s = c.contains,   !name.localizedCaseInsensitiveContains(s)           { return false }
+        if let p = c.startsWith, !name.lowercased().hasPrefix(p.lowercased())        { return false }
+        if let s = c.endsWith,   !name.lowercased().hasSuffix(s.lowercased())        { return false }
+        if let l = c.oneOf,     !l.map({$0.lowercased()}).contains(name.lowercased()) { return false }
+        if let l = c.notOneOf,   l.map({$0.lowercased()}).contains(name.lowercased()) { return false }
+        if c.isBlank == true  { return name.isEmpty }
+        if c.isBlank == false { return !name.isEmpty }
+        return true
+    }
+
+    private func checkColorLabel(url: URL, c: Condition) -> Bool {
+        guard let target = c.colorLabelValue else { return true }
+        let script = "tell app \"Finder\" to get label index of (POSIX file \"\(url.path)\" as alias)"
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        let pipe = Pipe()
+        p.arguments = ["-e", script]; p.standardOutput = pipe
+        try? p.run(); p.waitUntilExit()
+        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let idx = Int(out.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        return idx == target
+    }
+
+    private func checkComment(url: URL, c: Condition) -> Bool {
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/mdls")
+        let pipe = Pipe()
+        p.arguments = ["-name", "kMDItemFinderComment", "-raw", url.path]; p.standardOutput = pipe
+        try? p.run(); p.waitUntilExit()
+        let comment = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if c.isBlank == true  { return comment.isEmpty || comment == "(null)" }
+        if c.isBlank == false { return !comment.isEmpty && comment != "(null)" }
+        if let s = c.contains,   !comment.localizedCaseInsensitiveContains(s)             { return false }
+        if let s = c.equals,      comment.lowercased() != s.lowercased()                  { return false }
+        if let p = c.startsWith, !comment.lowercased().hasPrefix(p.lowercased())           { return false }
+        if let s = c.endsWith,   !comment.lowercased().hasSuffix(s.lowercased())           { return false }
+        return true
+    }
+
+    private func checkLocked(url: URL, c: Condition) -> Bool {
+        guard let expected = c.locked else { return true }
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let immutable = attrs[.immutable] as? Bool else { return false }
+        return immutable == expected
+    }
+
+    private func checkContents(url: URL, c: Condition) -> Bool {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+        if let s = c.contains,   !text.localizedCaseInsensitiveContains(s) { return false }
+        if let p = c.notGlob                                                { _ = p } // not supported for contents
+        if let r = c.regex {
+            guard let re = try? NSRegularExpression(pattern: r),
+                  re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil else { return false }
+        }
+        if c.isBlank == true  { return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if c.isBlank == false { return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return true
+    }
+
+    private func checkSourceURL(url: URL, c: Condition) -> Bool {
+        let xattr = Process(); xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        let pipe = Pipe()
+        xattr.arguments = ["-p", "com.apple.metadata:kMDItemWhereFroms", url.path]; xattr.standardOutput = pipe
+        try? xattr.run(); xattr.waitUntilExit()
+        let raw = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        if c.isBlank == true  { return raw.isEmpty }
+        if c.isBlank == false { return !raw.isEmpty }
+        if let s = c.contains, !raw.localizedCaseInsensitiveContains(s) { return false }
+        if let s = c.startsWith, !raw.lowercased().hasPrefix(s.lowercased()) { return false }
+        return true
+    }
+
+    private func checkDepth(url: URL, c: Condition) -> Bool {
+        guard let base = config.watch.first(where: { url.path.hasPrefix(($0.path as NSString).expandingTildeInPath) }) else { return false }
+        let basePath = (base.path as NSString).expandingTildeInPath
+        let relative = url.path.dropFirst(basePath.count)
+        let depth = relative.split(separator: "/").count
+        if let d = c.depth { return depth == d }
+        if let s = c.gt,  let n = UInt64(s) { if UInt64(depth) <= n { return false } }
+        if let s = c.lt,  let n = UInt64(s) { if UInt64(depth) >= n { return false } }
+        if let s = c.gte, let n = UInt64(s) { if UInt64(depth) < n  { return false } }
+        if let s = c.lte, let n = UInt64(s) { if UInt64(depth) > n  { return false } }
+        return true
+    }
+
+    private func checkItemCount(url: URL, c: Condition) -> Bool {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { return false }
+        let count = (try? FileManager.default.contentsOfDirectory(atPath: url.path))?.count ?? 0
+        if let fc = c.fileCount { return count == fc }
+        if let s = c.gt,  let n = UInt64(s) { if UInt64(count) <= n { return false } }
+        if let s = c.lt,  let n = UInt64(s) { if UInt64(count) >= n { return false } }
+        if let s = c.gte, let n = UInt64(s) { if UInt64(count) < n  { return false } }
+        if let s = c.lte, let n = UInt64(s) { if UInt64(count) > n  { return false } }
+        return true
+    }
+
+    private func checkCurrentTime(c: Condition) -> Bool {
+        let now = Date()
+        if let atT = c.atTime,    !matchesTimeOfDay(date: now, timeStr: atT, mode: .equals)  { return false }
+        if let bT  = c.beforeTime, !matchesTimeOfDay(date: now, timeStr: bT, mode: .before)  { return false }
+        if let aT  = c.afterTime,  !matchesTimeOfDay(date: now, timeStr: aT, mode: .after)   { return false }
+        if let s = c.inTheNext, let n = parseDurationSeconds(s) {
+            let futureDate = now.addingTimeInterval(n)
+            _ = futureDate  // "current time is in the next N" — always true if n > 0
+            return true
+        }
+        return true
+    }
+
+    private func checkAppleScript(url: URL, c: Condition) -> Bool {
+        guard let script = c.run else { return false }
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        p.arguments = ["-e", script]
+        p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+        try? p.run(); p.waitUntilExit()
+        return p.terminationStatus == 0
+    }
+
+    private func checkJavaScript(url: URL, c: Condition) -> Bool {
+        guard let script = c.run else { return false }
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        p.arguments = ["-l", "JavaScript", "-e", script]
+        p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+        try? p.run(); p.waitUntilExit()
+        return p.terminationStatus == 0
     }
 
     private func checkKind(url: URL, c: Condition) -> Bool {
@@ -241,6 +419,87 @@ public final class Engine {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             p.arguments = action.with.map { ["-a", $0, url.path] } ?? [url.path]
             try p.run(); return nil
+
+        case .removeTags:
+            guard let tags = action.message else { return nil }
+            if dryRun { Logger.info("    [dry-run] REMOVE TAGS: \(tags)"); return nil }
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", "tag --remove \(tags.split(separator:",").map{"'\($0.trimmingCharacters(in:.whitespaces))'"}.joined(separator:" ")) \"\(url.path)\" 2>/dev/null || true"]
+            try? p.run(); p.waitUntilExit(); return nil
+
+        case .addComment:
+            guard let comment = action.message.map({ expandTemplate($0, context: ctx) }) else { return nil }
+            if dryRun { Logger.info("    [dry-run] ADD COMMENT: \(comment)"); return nil }
+            let esc = comment.replacingOccurrences(of: "\"", with: "\\\"")
+            let script = "tell app \"Finder\" to set comment of (POSIX file \"\(url.path)\" as alias) to \"\(esc)\""
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+
+        case .toggleExtension:
+            if dryRun { Logger.info("    [dry-run] TOGGLE EXTENSION"); return nil }
+            let script = "tell app \"Finder\" to set extension hidden of (POSIX file \"\(url.path)\" as alias) to not (extension hidden of (POSIX file \"\(url.path)\" as alias))"
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+
+        case .toggleLock:
+            if dryRun { Logger.info("    [dry-run] TOGGLE LOCK"); return nil }
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let isLocked = attrs?[.immutable] as? Bool ?? false
+            try FileManager.default.setAttributes([.immutable: !isLocked], ofItemAtPath: url.path)
+            return nil
+
+        case .archive:
+            if dryRun { Logger.info("    [dry-run] ARCHIVE"); return nil }
+            let dest = (action.to.map { expandPath($0, context: ctx) } ?? url.deletingLastPathComponent().path)
+            let zipName = "\(url.deletingPathExtension().lastPathComponent).zip"
+            let zipPath = "\(dest)/\(zipName)"
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            p.arguments = ["-c", "-k", "--keepParent", url.path, zipPath]
+            try p.run(); p.waitUntilExit()
+            Logger.info("    ARCHIVE → \(zipPath)"); return nil
+
+        case .unarchive:
+            if dryRun { Logger.info("    [dry-run] UNARCHIVE"); return nil }
+            let dest = action.to.map { expandPath($0, context: ctx) } ?? url.deletingLastPathComponent().path
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            p.arguments = ["-x", "-k", url.path, dest]
+            try p.run(); p.waitUntilExit()
+            Logger.info("    UNARCHIVE → \(dest)"); return nil
+
+        case .importMusic:
+            if dryRun { Logger.info("    [dry-run] IMPORT MUSIC"); return nil }
+            let script = "tell app \"Music\" to add POSIX file \"\(url.path)\""
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", script]; try? p.run(); p.waitUntilExit(); return nil
+
+        case .importPhotos:
+            if dryRun { Logger.info("    [dry-run] IMPORT PHOTOS"); return nil }
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", "tell app \"Photos\" to import {POSIX file \"\(url.path)\"}"]
+            try? p.run(); p.waitUntilExit(); return nil
+
+        case .importTV:
+            if dryRun { Logger.info("    [dry-run] IMPORT TV"); return nil }
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", "tell app \"TV\" to add POSIX file \"\(url.path)\""]
+            try? p.run(); p.waitUntilExit(); return nil
+
+        case .runJavaScript:
+            guard let script = action.command.map({ expandTemplate($0, context: ctx) }) else { return nil }
+            if dryRun { Logger.info("    [dry-run] RUN JS"); return nil }
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-l", "JavaScript", "-e", script]
+            p.environment = ProcessInfo.processInfo.environment.merging(["DOUMI_FILE": url.path]) { $1 }
+            try p.run(); p.waitUntilExit(); return nil
+
+        case .runAutomator:
+            guard let wf = action.command else { return nil }
+            if dryRun { Logger.info("    [dry-run] RUN AUTOMATOR: \(wf)"); return nil }
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/automator")
+            p.arguments = ["-i", url.path, wf]; try p.run(); p.waitUntilExit(); return nil
+
+        case .continueMatching:
+            return nil  // handled at rule level via stop=false
         }
     }
 

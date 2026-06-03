@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# PROVIDE: doumid
+# REQUIRE: LOGIN dbus
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="doumid"
+rcvar=doumid_enable
+command="%%PREFIX%%/bin/doumid"
+pidfile="/var/run/doumid.pid"
+
+load_rc_config $name
+
+: ${doumid_enable:=NO}
+: ${doumid_dry_run:=NO}
+: ${doumid_debug:=NO}
+
+start_precmd=doumid_prestart
+
+doumid_prestart()
+{
+	if [ ! -d "${HOME}/.config/doumi" ]; then
+		mkdir -p "${HOME}/.config/doumi/rules" \
+		         "${HOME}/.config/doumi/scripts" \
+		         "${HOME}/.config/doumi/logs"
+	fi
+}
+
+command_args=""
+if checkyesno doumid_dry_run; then
+	command_args="${command_args} --dry-run"
+fi
+if checkyesno doumid_debug; then
+	command_args="${command_args} --debug"
+fi
+
+run_rc_command "$1"

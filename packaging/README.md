@@ -82,3 +82,38 @@ doumi logs -n 20
 ```
 
 Config lives in `~/.config/doumi/`. Rule JSON files are in `~/.config/doumi/rules/`.
+
+---
+
+## FreeBSD (.pkg)
+
+### Build and install
+
+```bash
+cd packaging/freebsd
+make install clean
+```
+
+Or use the quick install script:
+
+```bash
+./install-bsd.sh
+```
+
+### Post-install usage
+
+```bash
+# Start the daemon
+service doumid start
+
+# Enable auto-start on boot
+sysrc doumid_enable=YES
+
+# Create your first rule
+doumi rules add "Sort Downloads" -f ~/Downloads
+
+# Launch the GUI
+doumi gui
+```
+
+See `packaging/freebsd/README.md` for details on porting to NetBSD, OpenBSD, and DragonFly BSD.

@@ -1,13 +1,14 @@
-# Doumi — Intelligent File Organizer for Linux
+# Doumi — Intelligent File Organizer for Linux & BSD
 
 [![CI](https://github.com/YOUR_USERNAME/doumi/actions/workflows/release.yml/badge.svg)](https://github.com/YOUR_USERNAME/doumi/actions)
 
 **Doumi** watches your folders and automatically organizes files using rules
-you define — like Hazel for macOS, but native on Linux.  Move, rename, tag,
-archive, or run scripts on files that match conditions like extension, name
-pattern, date, size, or file kind.
+you define — like Hazel for macOS, but native on Linux and BSD.  Move, rename,
+tag, archive, or run scripts on files that match conditions like extension,
+name pattern, date, size, or file kind.
 
-Built in Rust.  Real-time watcher, cron scheduler, GTK4 GUI, and CLI.
+Built in Rust.  Real-time watcher (inotify / kqueue), cron scheduler,
+GTK4 GUI, and CLI.
 
 ---
 
@@ -69,6 +70,48 @@ cargo build --release
 ```
 
 **Build deps:** `cargo rustc gtk4 libadwaita`
+
+### 😈 FreeBSD
+
+#### From ports (recommended)
+
+```bash
+cd /usr/ports/sysutils/doumi
+make install clean
+```
+
+Or use `pkg` once the package is available:
+
+```bash
+pkg install doumi
+```
+
+#### Quick install script
+
+```bash
+git clone https://github.com/YOUR_USERNAME/doumi.git
+cd doumi
+./install-bsd.sh
+```
+
+#### rc.d service
+
+```bash
+# Start the daemon
+service doumid start
+
+# Auto-start on boot
+sysrc doumid_enable=YES
+
+# Optional: run in dry-run mode
+sysrc doumid_dry_run=YES
+```
+
+### 😈 NetBSD / OpenBSD / DragonFly BSD
+
+Build from source with `cargo build --release`.  See `packaging/freebsd/`
+for service script templates and adapt to your system's init system.
+The `install-bsd.sh` script provides a guided setup.
 
 ---
 
@@ -136,6 +179,9 @@ doumi logs
 
 # Auto-start daemon on login
 systemctl --user enable --now doumi
+
+# On BSD:
+service doumid start
 ```
 
 ---
@@ -200,11 +246,11 @@ Hazel-like madlib editor so you never need to touch JSON.
 ┌─────────────┐     IPC (Unix socket)      ┌──────────────┐
 │  doumi CLI  │◄──────────────────────────►│   doumid     │
 │  ─────────  │   status, reload, logs,    │   ────────   │
-│  rules add  │   preview, run             │   inotify    │
-│  rules list │                            │   cron       │
-│  daemon *   │                            │   engine     │
-│  logs       │                            │   sqlite db  │
-│  config     │                            └──────┬───────┘
+│  rules add  │   preview, run             │   inotify /  │
+│  rules list │                            │   kqueue     │
+│  daemon *   │                            │   cron       │
+│  logs       │                            │   engine     │
+│  config     │                            │   sqlite db  │
 └──────┬──────┘                                   │
        │ launches                                 │
        ▼                                          ▼
@@ -218,7 +264,7 @@ Hazel-like madlib editor so you never need to touch JSON.
 ```
 
 - **doumi** — CLI; talks to daemon over Unix socket, edits rule files
-- **doumid** — background daemon; watches files, evaluates rules, executes actions
+- **doumid** — background daemon; watches files (inotify on Linux, kqueue on BSD), evaluates rules, executes actions
 - **doumi-gui** — GTK4 visual rule editor
 - **doumi-core** — shared library: rule engine, conditions, actions, config loading
 

@@ -30,14 +30,15 @@ CREATE INDEX IF NOT EXISTS idx_events_file ON events(file_path);
 
 pub struct ActionLogger {
     conn: Connection,
+    max_entries: usize,
 }
 
 impl ActionLogger {
-    pub fn open(db_path: &Path) -> anyhow::Result<Self> {
+    pub fn open(db_path: &Path, max_entries: usize) -> anyhow::Result<Self> {
         let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         conn.execute_batch(CREATE_SQL)?;
-        Ok(Self { conn })
+        Ok(Self { conn, max_entries })
     }
 
     pub fn log_result(&self, result: &ProcessingResult) -> anyhow::Result<()> {
@@ -69,6 +70,9 @@ impl ActionLogger {
                 ],
             )?;
         }
+
+        // Auto-prune old entries to stay within the configured limit.
+        let _ = self.purge_old();
         Ok(())
     }
 
@@ -137,14 +141,14 @@ impl ActionLogger {
         }))
     }
 
-    pub fn purge_old(&self, max_entries: usize) -> anyhow::Result<usize> {
+    fn purge_old(&self) -> anyhow::Result<usize> {
         let count: i64 = self
             .conn
             .query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))?;
-        if count as usize <= max_entries {
+        if count as usize <= self.max_entries {
             return Ok(0);
         }
-        let delete_count = count as usize - max_entries;
+        let delete_count = count as usize - self.max_entries;
         self.conn.execute(
             "DELETE FROM events WHERE id IN (SELECT id FROM events ORDER BY ts ASC LIMIT ?1)",
             params![delete_count as i64],

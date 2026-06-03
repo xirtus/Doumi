@@ -1,0 +1,22 @@
+[
+{ type: install, message: <<EOM
+Doumi has been installed!
+
+Quick start:
+  service doumid start          # start the background daemon
+  doumi rules add "My Rule" -f ~/Downloads   # create your first rule
+  doumi gui                     # launch the graphical rule editor
+
+Auto-start on boot:
+  sysrc doumid_enable=YES
+
+Configuration: ~/.config/doumi/
+Rules:          ~/.config/doumi/rules/
+Logs:           ~/.config/doumi/logs/
+
+For help:
+  doumi --help
+  man doumi
+EOM
+}
+]

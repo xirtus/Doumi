@@ -54,7 +54,7 @@ fn daemon_call(cmd: Value) -> Value {
 #[derive(Parser)]
 #[command(
     name = "doumi",
-    about = "Doumi — intelligent file organizer for Linux",
+    about = "Doumi — intelligent file organizer for Linux & BSD",
     version
 )]
 struct Cli {

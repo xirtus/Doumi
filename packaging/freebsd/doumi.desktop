@@ -1,0 +1,20 @@
+[Desktop Entry]
+Name=Doumi
+GenericName=File Organizer
+Comment=Intelligent file organization rules for Linux and BSD
+Exec=doumi gui
+Icon=doumi
+Terminal=false
+Type=Application
+Categories=Utility;FileManager;
+Keywords=file;organize;automate;rules;hazel;
+StartupWMClass=doumi
+Actions=StartDaemon;StopDaemon;
+
+[Desktop Action StartDaemon]
+Name=Start Daemon
+Exec=doumi daemon start
+
+[Desktop Action StopDaemon]
+Name=Stop Daemon
+Exec=doumi daemon stop

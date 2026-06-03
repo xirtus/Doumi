@@ -392,7 +392,7 @@ mod tests {
         let config = test_config(tmp);
         let mut saved_rule = rule;
         config.save_rule(&mut saved_rule).unwrap();
-        let db = ActionLogger::open(&tmp.path().join("doumi.db")).unwrap();
+        let db = ActionLogger::open(&tmp.path().join("doumi.db"), 10_000).unwrap();
         DaemonState::new(config, db, dry_run)
     }
 

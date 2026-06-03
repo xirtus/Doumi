@@ -606,6 +606,20 @@ fn execute_tag(file: &FileInfo, tags: &[String], dry_run: bool) -> ActionResult 
         );
     }
 
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+    {
+        tag_via_xattr(p, tags)
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "freebsd")))]
+    {
+        // Fallback: store tags in a sidecar file
+        tag_via_sidecar(p, tags)
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+fn tag_via_xattr(p: &std::path::Path, tags: &[String]) -> ActionResult {
     let current = xattr::get(p, "user.tags")
         .ok()
         .flatten()
@@ -622,6 +636,37 @@ fn execute_tag(file: &FileInfo, tags: &[String], dry_run: bool) -> ActionResult 
 
     match xattr::set(p, "user.tags", merged_str.as_bytes()) {
         Ok(()) => ActionResult::success("tag", format!("Tagged: {merged_str}")),
+        Err(e) => ActionResult::failure("tag", e.to_string()),
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "freebsd")))]
+fn tag_via_sidecar(p: &std::path::Path, tags: &[String]) -> ActionResult {
+    // On platforms without native xattr support (NetBSD, OpenBSD, DragonFly),
+    // fall back to a .doumi_tags.json sidecar file in the same directory.
+    let sidecar = p.parent().unwrap_or(std::path::Path::new("."))
+        .join(format!(".{}.doumi_tags.json", p.file_name().unwrap_or_default().to_string_lossy()));
+
+    let mut map: std::collections::BTreeMap<String, Vec<String>> =
+        if sidecar.exists() {
+            std::fs::read_to_string(&sidecar)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            Default::default()
+        };
+
+    let key = p.to_string_lossy().to_string();
+    let entry = map.entry(key).or_default();
+    for tag in tags {
+        if !entry.contains(tag) {
+            entry.push(tag.clone());
+        }
+    }
+
+    match std::fs::write(&sidecar, serde_json::to_string_pretty(&map).unwrap_or_default()) {
+        Ok(()) => ActionResult::success("tag", format!("Tagged (sidecar): {:?}", tags)),
         Err(e) => ActionResult::failure("tag", e.to_string()),
     }
 }

@@ -30,7 +30,6 @@ zip = "2"
 tar = "0.4"
 flate2 = "1"
 bzip2 = "0.4"
-xattr = "1"
 notify-rust = "4"
 clap = { version = "4", features = ["derive"] }
 tokio-cron-scheduler = "0.13"

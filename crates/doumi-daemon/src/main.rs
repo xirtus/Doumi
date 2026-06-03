@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = ConfigManager::new()?;
-    let db = ActionLogger::open(&config.db_path())?;
+    let db = ActionLogger::open(&config.db_path(), config.settings.max_log_entries)?;
     let dry_run = args.dry_run || config.settings.dry_run;
 
     let state = DaemonState::new(config, db, dry_run);

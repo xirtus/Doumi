@@ -1,0 +1,15 @@
+Doumi is an intelligent file organizer that watches your folders and
+automatically organizes files using rules you define -- like Hazel for
+macOS, but native on Linux and BSD.
+
+Features:
+  - Real-time file watching via kqueue
+  - Cron-based scheduled scans
+  - Rich condition system (name, extension, date, size, MIME type, kind)
+  - Actions: move, copy, rename, trash, delete, archive, notify, run scripts
+  - GTK4 + libadwaita graphical rule editor
+  - CLI for scripting and automation
+  - Unix domain socket IPC between daemon and client
+  - SQLite-backed action logging
+
+WWW: https://github.com/YOUR_USERNAME/doumi

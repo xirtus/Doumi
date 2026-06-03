@@ -220,4 +220,4 @@ _(Import support coming in v0.2)_
 
 ## License
 
-MIT
+GPL 3.0

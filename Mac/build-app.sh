@@ -12,11 +12,22 @@ echo "╔═══════════════════════�
 echo "║  Building Doumi.app  v$VERSION   ║"
 echo "╚══════════════════════════════════╝"
 
-# ── 1. Build binaries ─────────────────────────────────────────────────────────
+# ── 1. Build universal binaries ──────────────────────────────────────────────────
 echo ""
-echo "▸ Building release binaries…"
-swift build -c release --product DoumiApp 2>&1
-swift build -c release --product doumi   2>&1
+echo "▸ Building universal release binaries (arm64 + x86_64)…"
+swift build -c release --product DoumiApp --arch arm64 2>&1
+swift build -c release --product DoumiApp --arch x86_64 2>&1
+lipo -create \
+  .build/arm64-apple-macosx/release/DoumiApp \
+  .build/x86_64-apple-macosx/release/DoumiApp \
+  -output "$BUILD_DIR/DoumiApp"
+
+swift build -c release --product doumi --arch arm64   2>&1
+swift build -c release --product doumi --arch x86_64 2>&1
+lipo -create \
+  .build/arm64-apple-macosx/release/doumi \
+  .build/x86_64-apple-macosx/release/doumi \
+  -output "$BUILD_DIR/doumi"
 
 # ── 2. Generate icon ──────────────────────────────────────────────────────────
 echo ""

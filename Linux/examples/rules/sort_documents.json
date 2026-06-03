@@ -1,0 +1,39 @@
+{
+  "id": "sort-documents",
+  "name": "Sort Documents by Type",
+  "description": "Move documents from Downloads to ~/Documents subfolders by type",
+  "enabled": true,
+  "priority": 2,
+  "folders": [
+    {
+      "path": "~/Downloads",
+      "recursive": false
+    }
+  ],
+  "triggers": {
+    "on_add": true,
+    "on_modify": false,
+    "on_delete": false,
+    "schedule": null
+  },
+  "conditions": {
+    "type": "group",
+    "match": "all",
+    "items": [
+      {
+        "type": "kind",
+        "operator": "is_one_of",
+        "value": ["document", "spreadsheet"]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "move",
+      "destination": "~/Documents/{kind}/{year}",
+      "on_conflict": "rename",
+      "create_parents": true
+    }
+  ],
+  "continue_matching": true
+}

@@ -1,0 +1,47 @@
+{
+  "id": "compress-large-archives",
+  "name": "Auto-compress Large Folders",
+  "description": "Compress folders in staging area that are larger than 500 MB",
+  "enabled": false,
+  "priority": 5,
+  "folders": [
+    {
+      "path": "~/Staging",
+      "recursive": false
+    }
+  ],
+  "triggers": {
+    "on_add": true,
+    "on_modify": false,
+    "on_delete": false,
+    "schedule": null
+  },
+  "conditions": {
+    "type": "group",
+    "match": "all",
+    "items": [
+      {
+        "type": "is_directory",
+        "value": true
+      },
+      {
+        "type": "size",
+        "operator": "greater_than",
+        "value": 500,
+        "unit": "mb"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "compress",
+      "format": "tar.gz",
+      "destination": "~/Archive/{name}.tar.gz"
+    },
+    {
+      "type": "delete",
+      "recursive": true
+    }
+  ],
+  "continue_matching": false
+}

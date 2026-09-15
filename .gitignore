@@ -1,3 +1,59 @@
+# ==========================================
+# Doumi Root Git Ignore Configuration
+# ==========================================
+
+# --- System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- Swift / Xcode Build Files ---
+.build/
+.swiftpm/
+Package.resolved
+DerivedData/
+*.xcworkspace
+xcuserdata/
+
+# --- Build Outputs & Installer Artifacts ---
+*.dmg
+*.app/
+*.AppImage
+*.tar.gz
+*.o
+*.d
+*.log
+
+# --- AI Assistants & IDE Configurations ---
+.claude/
+.gemini/
+.copilot/
+.cursor/
+.vscode/
+.idea/
+*transcript*.jsonl
+*history*.jsonl
+scratch/
+
+# --- Sensitive Data & Credentials (Prevention) ---
+.env
+*.env
+*.pem
+*.key
+secrets.*
+*credentials*
+*private_key*
+
+# --- Local Workspace Documents & Duplicate Sources ---
+# (Temporary files and specs used during development)
+configulator.md
+README copy.md
+Sources/
+rules/
 /target/
 .gpg/
 *.deb

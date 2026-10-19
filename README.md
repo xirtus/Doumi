@@ -1,4 +1,4 @@
-<img width="784" height="657" alt="doumi" src="docs/screenshot.png" />
+<img width="784" height="657" alt="doumi" src="docs/screenshot.jpg" />
 <div align="center">
 
 # Doumi

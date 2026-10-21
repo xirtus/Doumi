@@ -503,12 +503,12 @@ impl Condition {
                     StringOp::EndsWith => values.iter().any(|v| stem.ends_with(v.as_str())),
                     StringOp::MatchesGlob => values
                         .iter()
-                        .any(|v| glob::Pattern::new(v).map_or(false, |p| p.matches(&name))),
+                        .any(|v| glob::Pattern::new(v).is_ok_and(|p| p.matches(&name))),
                     StringOp::MatchesRegex => {
                         let flags = if *case_sensitive { "" } else { "(?i)" };
                         values.iter().any(|v| {
                             regex::Regex::new(&format!("{flags}{v}"))
-                                .map_or(false, |re| re.is_match(&name))
+                                .is_ok_and(|re| re.is_match(&name))
                         })
                     }
                     StringOp::IsOneOf => values.iter().any(|v| name == *v || stem == *v),
@@ -578,7 +578,7 @@ impl Condition {
                 let mime = file.mime_type.to_lowercase();
                 let values: Vec<String> = value.to_vec().iter().map(|v| v.to_lowercase()).collect();
                 match operator {
-                    StringOp::Is | StringOp::IsOneOf => values.iter().any(|v| mime == *v),
+                    StringOp::Is | StringOp::IsOneOf => values.contains(&mime),
                     StringOp::IsNot | StringOp::IsNotOneOf => values.iter().all(|v| mime != *v),
                     StringOp::StartsWith => values.iter().any(|v| mime.starts_with(v.as_str())),
                     StringOp::Contains => values.iter().any(|v| mime.contains(v.as_str())),
@@ -635,7 +635,7 @@ impl Condition {
                     TextOp::Contains => text.to_lowercase().contains(&value.to_lowercase()),
                     TextOp::NotContains => !text.to_lowercase().contains(&value.to_lowercase()),
                     TextOp::MatchesRegex => {
-                        regex::Regex::new(value).map_or(false, |re| re.is_match(&text))
+                        regex::Regex::new(value).is_ok_and(|re| re.is_match(&text))
                     }
                 }
             }
@@ -677,7 +677,7 @@ impl Condition {
                     .arg(&cmd)
                     .arg(file.path.to_string_lossy().as_ref())
                     .output()
-                    .map_or(false, |o| o.status.success())
+                    .is_ok_and(|o| o.status.success())
             }
         }
     }

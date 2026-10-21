@@ -127,7 +127,7 @@ impl ConfigManager {
         let mut rules: Vec<RuleConfig> = std::fs::read_dir(&self.rules_dir)
             .map(|rd| {
                 rd.filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().map_or(false, |x| x == "json"))
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
                     .filter_map(|e| {
                         load_rule_file(&e.path())
                             .map_err(|err| {
@@ -205,7 +205,7 @@ impl ConfigManager {
     pub fn set_setting(&mut self, key: &str, value: serde_json::Value) -> anyhow::Result<()> {
         let mut map: serde_json::Map<String, serde_json::Value> =
             serde_json::to_value(&self.settings)
-                .and_then(|v| serde_json::from_value(v))
+                .and_then(serde_json::from_value)
                 .unwrap_or_default();
         map.insert(key.to_string(), value);
         self.settings = serde_json::from_value(serde_json::Value::Object(map))?;

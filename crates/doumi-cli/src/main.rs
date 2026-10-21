@@ -261,7 +261,9 @@ fn handle_daemon(cmd: DaemonCmd) {
 
             #[cfg(unix)]
             {
-                child.stdout(process::Stdio::null()).stderr(process::Stdio::null());
+                child
+                    .stdout(process::Stdio::null())
+                    .stderr(process::Stdio::null());
                 unsafe {
                     use std::os::unix::process::CommandExt;
                     child.pre_exec(|| {
@@ -394,14 +396,12 @@ fn handle_rules(cmd: RulesCmd) {
                 return;
             }
             if rules.is_empty() {
-                println!(
-                    "No rules configured. Add one with: doumi rules add <name> -f <folder>"
-                );
+                println!("No rules configured. Add one with: doumi rules add <name> -f <folder>");
                 return;
             }
             println!(
-                "{:<12} {:<30} {:<10} {:>4}  {}",
-                "ID", "Name", "Status", "Pri", "Triggers"
+                "{:<12} {:<30} {:<10} {:>4}  Triggers",
+                "ID", "Name", "Status", "Pri"
             );
             println!("{}", "-".repeat(70));
             for r in &rules {
@@ -482,9 +482,13 @@ fn handle_rules(cmd: RulesCmd) {
             if edit {
                 let editor = std::env::var("EDITOR").unwrap_or_else(|_| {
                     #[cfg(windows)]
-                    { "notepad.exe".to_string() }
+                    {
+                        "notepad.exe".to_string()
+                    }
                     #[cfg(not(windows))]
-                    { "nano".to_string() }
+                    {
+                        "nano".to_string()
+                    }
                 });
                 let _ = std::process::Command::new(editor).arg(&path).status();
             }
@@ -501,9 +505,13 @@ fn handle_rules(cmd: RulesCmd) {
                 .unwrap_or_else(|| cfg.rules_dir.join(format!("{rule_id}.json")));
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| {
                 #[cfg(windows)]
-                { "notepad.exe".to_string() }
+                {
+                    "notepad.exe".to_string()
+                }
                 #[cfg(not(windows))]
-                { "nano".to_string() }
+                {
+                    "nano".to_string()
+                }
             });
             let _ = std::process::Command::new(editor).arg(&src).status();
             println!("Tip: run 'doumi daemon reload' to apply changes");
@@ -586,9 +594,7 @@ fn handle_rules(cmd: RulesCmd) {
                                 println!(
                                     "[dry] {}: skipped {} ({reason})",
                                     result.rule_name,
-                                    path.file_name()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
+                                    path.file_name().unwrap_or_default().to_string_lossy()
                                 );
                             }
                         } else if result.matched {
@@ -597,9 +603,7 @@ fn handle_rules(cmd: RulesCmd) {
                             println!(
                                 "{prefix}{}: matched {}",
                                 result.rule_name,
-                                path.file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy()
+                                path.file_name().unwrap_or_default().to_string_lossy()
                             );
                             for ar in &result.action_results {
                                 let icon = if ar.success { '✓' } else { '✗' };
@@ -902,7 +906,10 @@ fn handle_gui() {
 fn find_binary(name: &str) -> PathBuf {
     // Look next to current binary first
     if let Ok(exe) = std::env::current_exe() {
-        let sibling = exe.parent().unwrap_or(Path::new(".")).join(binary_name(name));
+        let sibling = exe
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(binary_name(name));
         if sibling.exists() {
             return sibling;
         }

@@ -228,6 +228,7 @@ impl Action {
 
 // ─── Action implementations ──────────────────────────────────────────────────
 
+#[allow(clippy::result_large_err)]
 fn apply_conflict(dest: PathBuf, policy: &ConflictPolicy) -> Result<Option<PathBuf>, ActionResult> {
     if !dest.exists() {
         return Ok(Some(dest));
@@ -580,6 +581,7 @@ fn execute_compress(
 
 fn execute_set_permissions(file: &FileInfo, permissions: &str, dry_run: bool) -> ActionResult {
     let p = &file.path;
+    #[cfg(unix)]
     let mode = u32::from_str_radix(permissions.trim_start_matches("0o"), 8)
         .unwrap_or_else(|_| u32::from_str_radix(permissions, 8).unwrap_or(0o644));
 
@@ -655,18 +657,22 @@ fn tag_via_xattr(p: &std::path::Path, tags: &[String]) -> ActionResult {
 fn tag_via_sidecar(p: &std::path::Path, tags: &[String]) -> ActionResult {
     // On platforms without native xattr support (NetBSD, OpenBSD, DragonFly),
     // fall back to a .doumi_tags.json sidecar file in the same directory.
-    let sidecar = p.parent().unwrap_or(std::path::Path::new("."))
-        .join(format!(".{}.doumi_tags.json", p.file_name().unwrap_or_default().to_string_lossy()));
+    let sidecar = p
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join(format!(
+            ".{}.doumi_tags.json",
+            p.file_name().unwrap_or_default().to_string_lossy()
+        ));
 
-    let mut map: std::collections::BTreeMap<String, Vec<String>> =
-        if sidecar.exists() {
-            std::fs::read_to_string(&sidecar)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default()
-        } else {
-            Default::default()
-        };
+    let mut map: std::collections::BTreeMap<String, Vec<String>> = if sidecar.exists() {
+        std::fs::read_to_string(&sidecar)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    } else {
+        Default::default()
+    };
 
     let key = p.to_string_lossy().to_string();
     let entry = map.entry(key).or_default();
@@ -676,7 +682,10 @@ fn tag_via_sidecar(p: &std::path::Path, tags: &[String]) -> ActionResult {
         }
     }
 
-    match std::fs::write(&sidecar, serde_json::to_string_pretty(&map).unwrap_or_default()) {
+    match std::fs::write(
+        &sidecar,
+        serde_json::to_string_pretty(&map).unwrap_or_default(),
+    ) {
         Ok(()) => ActionResult::success("tag", format!("Tagged (sidecar): {:?}", tags)),
         Err(e) => ActionResult::failure("tag", e.to_string()),
     }
@@ -729,6 +738,7 @@ fn execute_open(file: &FileInfo, command: Option<&str>, dry_run: bool) -> Action
     #[cfg(not(target_os = "windows"))]
     let default_cmd = "xdg-open";
 
+    #[cfg(not(target_os = "windows"))]
     let cmd = command.unwrap_or(default_cmd);
 
     #[cfg(target_os = "windows")]

@@ -12,9 +12,9 @@ use crate::state::DaemonState;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TriggerEvent {
-    OnAdd,
-    OnModify,
-    OnDelete,
+    Add,
+    Modify,
+    Delete,
 }
 
 pub async fn run_watcher(state: Arc<DaemonState>) -> anyhow::Result<()> {
@@ -40,9 +40,9 @@ pub async fn run_watcher(state: Arc<DaemonState>) -> anyhow::Result<()> {
         match res {
             Ok(event) => {
                 let trigger = match event.kind {
-                    EventKind::Create(_) => Some(TriggerEvent::OnAdd),
-                    EventKind::Modify(_) => Some(TriggerEvent::OnModify),
-                    EventKind::Remove(_) => Some(TriggerEvent::OnDelete),
+                    EventKind::Create(_) => Some(TriggerEvent::Add),
+                    EventKind::Modify(_) => Some(TriggerEvent::Modify),
+                    EventKind::Remove(_) => Some(TriggerEvent::Delete),
                     _ => None,
                 };
 
@@ -109,9 +109,9 @@ async fn process_event(path: PathBuf, trigger: TriggerEvent, state: &DaemonState
         .rules
         .iter()
         .filter(|r| match trigger {
-            TriggerEvent::OnAdd => r.cfg.triggers.on_add,
-            TriggerEvent::OnModify => r.cfg.triggers.on_modify,
-            TriggerEvent::OnDelete => r.cfg.triggers.on_delete,
+            TriggerEvent::Add => r.cfg.triggers.on_add,
+            TriggerEvent::Modify => r.cfg.triggers.on_modify,
+            TriggerEvent::Delete => r.cfg.triggers.on_delete,
         })
         .collect();
 
@@ -119,7 +119,7 @@ async fn process_event(path: PathBuf, trigger: TriggerEvent, state: &DaemonState
         return;
     }
 
-    if trigger == TriggerEvent::OnDelete || !path.exists() {
+    if trigger == TriggerEvent::Delete || !path.exists() {
         return;
     }
 

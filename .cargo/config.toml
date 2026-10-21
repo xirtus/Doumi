@@ -1,3 +1,0 @@
-[build]
-# Override global custom target; build for native host
-target = "x86_64-unknown-linux-gnu"

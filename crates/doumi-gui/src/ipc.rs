@@ -25,7 +25,7 @@ pub fn ipc_call(socket: &PathBuf, cmd: Value) -> Value {
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
         reader.read_line(&mut line).ok();
-        return serde_json::from_str(&line).unwrap_or(serde_json::json!({"ok": false}));
+        serde_json::from_str(&line).unwrap_or(serde_json::json!({"ok": false}))
     }
 
     #[cfg(windows)]
@@ -59,7 +59,7 @@ pub fn ipc_call(socket: &PathBuf, cmd: Value) -> Value {
         let mut reader = BufReader::new(&mut stream);
         let mut line = String::new();
         reader.read_line(&mut line).ok();
-        return serde_json::from_str(&line).unwrap_or(serde_json::json!({"ok": false}));
+        serde_json::from_str(&line).unwrap_or(serde_json::json!({"ok": false}))
     }
 }
 

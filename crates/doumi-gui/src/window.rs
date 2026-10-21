@@ -549,6 +549,7 @@ pub fn build(app: &adw::Application, config: ConfigManager) -> adw::ApplicationW
 
 // ─── Load rules into sidebar list ─────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn load_rules(
     state: S,
     list_box: &gtk4::ListBox,
@@ -621,7 +622,7 @@ fn build_rule_row(state: S, idx: usize) -> adw::ActionRow {
 
     // Priority badge
     let prio = gtk4::Label::builder()
-        .label(&rule.priority.to_string())
+        .label(rule.priority.to_string())
         .valign(gtk4::Align::Center)
         .css_classes(["caption", "dim-label", "priority-badge"])
         .width_chars(2)
@@ -792,7 +793,7 @@ fn load_detail(container: &gtk4::Box, rule: &RuleConfig) {
         .unwrap_or("all")
         .to_uppercase();
     let cond_expander = adw::ExpanderRow::builder()
-        .title(&format!("Match {match_label} of these conditions"))
+        .title(format!("Match {match_label} of these conditions"))
         .build();
     let items = conditions_json
         .get("items")
@@ -900,7 +901,7 @@ fn make_condition_row(item: &Value) -> adw::ActionRow {
     );
     let row = adw::ActionRow::builder()
         .title(
-            &ctype
+            ctype
                 .replace('_', " ")
                 .split_whitespace()
                 .map(|w| {

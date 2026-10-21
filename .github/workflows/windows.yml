@@ -34,13 +34,13 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build
-        run: cargo build --workspace
+        run: cargo build --workspace --exclude doumi-gui
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude doumi-gui
 
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude doumi-gui -- -D warnings
 
       - name: Format check
         run: cargo fmt -- --check

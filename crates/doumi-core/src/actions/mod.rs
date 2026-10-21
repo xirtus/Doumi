@@ -727,6 +727,7 @@ fn execute_log(
     ActionResult::success("log", msg)
 }
 
+#[cfg_attr(target_os = "windows", allow(unused_variables))]
 fn execute_open(file: &FileInfo, command: Option<&str>, dry_run: bool) -> ActionResult {
     let p = &file.path;
     if dry_run {

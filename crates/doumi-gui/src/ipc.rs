@@ -35,22 +35,16 @@ pub fn ipc_call(socket: &PathBuf, cmd: Value) -> Value {
         let port_path = socket.with_extension("port");
         let port_str = match std::fs::read_to_string(&port_path) {
             Ok(s) => s,
-            Err(_) => {
-                return serde_json::json!({"ok": false, "error": "Daemon not running"})
-            }
+            Err(_) => return serde_json::json!({"ok": false, "error": "Daemon not running"}),
         };
         let port: u16 = match port_str.trim().parse() {
             Ok(p) => p,
-            Err(_) => {
-                return serde_json::json!({"ok": false, "error": "Daemon not running"})
-            }
+            Err(_) => return serde_json::json!({"ok": false, "error": "Daemon not running"}),
         };
 
         let mut stream = match TcpStream::connect(("127.0.0.1", port)) {
             Ok(s) => s,
-            Err(_) => {
-                return serde_json::json!({"ok": false, "error": "Daemon not running"})
-            }
+            Err(_) => return serde_json::json!({"ok": false, "error": "Daemon not running"}),
         };
         stream
             .set_read_timeout(Some(std::time::Duration::from_secs(5)))

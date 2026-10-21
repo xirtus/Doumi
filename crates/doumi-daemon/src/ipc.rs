@@ -236,9 +236,7 @@ async fn handle_command(req: serde_json::Value, state: &DaemonState) -> serde_js
         "run_rule" => {
             let rule_id = match req["rule_id"].as_str() {
                 Some(id) => id.to_string(),
-                None => {
-                    return serde_json::json!({"ok": false, "error": "rule_id required"})
-                }
+                None => return serde_json::json!({"ok": false, "error": "rule_id required"}),
             };
             let folder = req["folder"]
                 .as_str()
@@ -289,9 +287,7 @@ async fn handle_command(req: serde_json::Value, state: &DaemonState) -> serde_js
         "preview_rule" => {
             let rule_id = match req["rule_id"].as_str() {
                 Some(id) => id.to_string(),
-                None => {
-                    return serde_json::json!({"ok": false, "error": "rule_id required"})
-                }
+                None => return serde_json::json!({"ok": false, "error": "rule_id required"}),
             };
             let folder = req["folder"]
                 .as_str()
@@ -605,7 +601,9 @@ mod tests {
         assert!(preview.matched.is_empty());
         assert_eq!(preview.skipped.len(), 1);
         assert_eq!(preview.skipped[0].path, path_to_string(&report));
-        assert!(preview.skipped[0].reason.contains("outside allowed depth 1"));
+        assert!(preview.skipped[0]
+            .reason
+            .contains("outside allowed depth 1"));
         assert!(report.exists());
     }
 

@@ -17,9 +17,9 @@ pub const PROJECT_MARKERS: &[&str] = &[
     "mix.exs",
     "deno.json",
     // Windows / cross-platform project markers
-    ".sln",        // Visual Studio solution
-    ".csproj",     // C# project
-    ".vbproj",     // VB.NET project
+    ".sln",    // Visual Studio solution
+    ".csproj", // C# project
+    ".vbproj", // VB.NET project
     "CMakeLists.txt",
     "Makefile",
     "gradle.build",
